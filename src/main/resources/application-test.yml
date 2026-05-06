@@ -1,0 +1,23 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  mail:
+    host: localhost
+    port: 25
+    username: test
+    password: test
+
+app:
+  jwt:
+    secret: testJwtSecretKljucKojiJeDovoljnoDugackiZaHS256Algoritam!!
+    access-token-expiration-minutes: 15
+    refresh-token-expiration-days: 7
+  storage:
+    base-dir: ./build/test-storage
+
+logging:
+  level:
+    rs.skola.platforma: DEBUG

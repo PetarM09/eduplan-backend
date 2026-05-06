@@ -1,0 +1,91 @@
+spring:
+  application:
+    name: skolska-platforma
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/skolska_platforma}
+    username: ${DB_USER:skolska}
+    password: ${DB_PASS:skolska}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc.time_zone: Europe/Belgrade
+        format_sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USER:}
+    password: ${MAIL_PASS:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls.enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: always
+    include-binding-errors: always
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:promeni-ovaj-tajni-kljuc-najmanje-32-karaktera-dugacak!!}
+    issuer: skolska-platforma
+    access-token-expiration-minutes: ${JWT_ACCESS_EXP:15}
+    refresh-token-expiration-days: ${JWT_REFRESH_EXP:7}
+  storage:
+    base-dir: ${STORAGE_DIR:./storage}
+  async:
+    core-pool-size: 4
+    max-pool-size: 16
+    queue-capacity: 100
+
+logging:
+  level:
+    rs.skola.platforma: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: INFO
