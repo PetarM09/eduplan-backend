@@ -3,7 +3,7 @@ spring:
     name: skolska-platforma
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/skolska_platforma}
+    url: ${DB_URL:jdbc:postgresql://localhost:55432/skolska_platforma}
     username: ${DB_USER:skolska}
     password: ${DB_PASS:skolska}
     hikari:
