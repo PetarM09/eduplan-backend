@@ -1,0 +1,39 @@
+package rs.skola.platforma.raspored.repo;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+import rs.skola.platforma.raspored.domain.RasporedStavka;
+
+import java.util.List;
+import java.util.UUID;
+
+@Repository
+public interface RasporedStavkaRepository extends JpaRepository<RasporedStavka, UUID> {
+
+    @Query("""
+            SELECT rs FROM RasporedStavka rs
+            LEFT JOIN FETCH rs.odeljenje
+            WHERE rs.skolaId = :skolaId
+              AND rs.verzija.id = :verzijaId
+              AND rs.korisnik.id = :korisnikId
+            ORDER BY rs.dan ASC, rs.cas ASC
+            """)
+    List<RasporedStavka> mojRaspored(@Param("skolaId") UUID skolaId,
+                                     @Param("verzijaId") UUID verzijaId,
+                                     @Param("korisnikId") UUID korisnikId);
+
+    @Query("""
+            SELECT rs FROM RasporedStavka rs
+            LEFT JOIN FETCH rs.korisnik
+            LEFT JOIN FETCH rs.odeljenje
+            WHERE rs.skolaId = :skolaId
+              AND rs.verzija.id = :verzijaId
+              AND rs.dan = :dan
+            ORDER BY rs.cas ASC
+            """)
+    List<RasporedStavka> rasporedDana(@Param("skolaId") UUID skolaId,
+                                      @Param("verzijaId") UUID verzijaId,
+                                      @Param("dan") rs.skola.platforma.raspored.domain.Dan dan);
+}
