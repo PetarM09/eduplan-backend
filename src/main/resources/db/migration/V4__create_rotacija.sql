@@ -27,6 +27,9 @@ CREATE TABLE rot_nedelje (
     broj_nedelje        SMALLINT NOT NULL,
     odeljenja_json      JSONB NOT NULL,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ,
+    created_by          VARCHAR(255),
+    updated_by          VARCHAR(255),
     CONSTRAINT uq_rot_nedelje UNIQUE (konfiguracija_id, broj_nedelje)
 );
 

@@ -52,6 +52,9 @@ CREATE TABLE raspored_stavke (
     dan             VARCHAR(15) NOT NULL,
     cas             SMALLINT NOT NULL,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ,
+    created_by      VARCHAR(255),
+    updated_by      VARCHAR(255),
     CONSTRAINT chk_raspored_dan CHECK (dan IN
         ('PONEDELJAK','UTORAK','SREDA','CETVRTAK','PETAK','SUBOTA')),
     CONSTRAINT chk_raspored_cas CHECK (cas BETWEEN 1 AND 8)

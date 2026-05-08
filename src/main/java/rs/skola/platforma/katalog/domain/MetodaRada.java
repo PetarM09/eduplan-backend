@@ -1,0 +1,40 @@
+package rs.skola.platforma.katalog.domain;
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import rs.skola.platforma.common.domain.BaseEntity;
+import rs.skola.platforma.tenant.domain.Skola;
+
+/**
+ * Sistemska metoda rada ima skola_id = NULL i dostupna je svim skolama
+ * (Predavanje, Demonstracija, Grupni rad, Diskusija, Prakticna vezba, ...).
+ * Skola moze dodati sopstvene metode.
+ */
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Entity
+@Table(name = "metode_rada")
+public class MetodaRada extends BaseEntity {
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "skola_id")
+    private Skola skola;
+
+    @Column(nullable = false, length = 100)
+    private String naziv;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean aktivan = true;
+
+    public boolean jeSistemska() {
+        return skola == null;
+    }
+}

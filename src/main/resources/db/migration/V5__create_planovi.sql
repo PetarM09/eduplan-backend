@@ -48,6 +48,10 @@ CREATE TABLE godisnji_plan_teme (
     cas_utvrd           SMALLINT DEFAULT 0,
     cas_ostalo          SMALLINT DEFAULT 0,
     ukupno_casova       SMALLINT DEFAULT 0,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ,
+    created_by          VARCHAR(255),
+    updated_by          VARCHAR(255),
     CONSTRAINT uq_god_plan_tema UNIQUE (godisnji_plan_id, tema_id)
 );
 
@@ -92,6 +96,10 @@ CREATE TABLE op_stavke (
     tip_casa_id             UUID REFERENCES tipovi_casa(id) ON DELETE SET NULL,
     metoda_rada_id          UUID REFERENCES metode_rada(id) ON DELETE SET NULL,
     evaluacija              TEXT,
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at              TIMESTAMPTZ,
+    created_by              VARCHAR(255),
+    updated_by              VARCHAR(255),
     CONSTRAINT uq_op_stavke_red UNIQUE (operativni_plan_id, redni_broj_casa)
 );
 
@@ -107,7 +115,11 @@ CREATE TABLE op_stavka_medjupredmetno (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     op_stavka_id        UUID NOT NULL REFERENCES op_stavke(id) ON DELETE CASCADE,
     predmet_id          UUID NOT NULL REFERENCES predmeti(id) ON DELETE CASCADE,
-    opis_kompetencije   TEXT
+    opis_kompetencije   TEXT,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ,
+    created_by          VARCHAR(255),
+    updated_by          VARCHAR(255)
 );
 
 CREATE INDEX idx_op_medjupredmetno_stavka ON op_stavka_medjupredmetno (op_stavka_id);

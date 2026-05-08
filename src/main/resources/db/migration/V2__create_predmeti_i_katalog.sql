@@ -88,7 +88,10 @@ CREATE TABLE tipovi_casa (
     skola_id        UUID REFERENCES skole(id) ON DELETE CASCADE,
     naziv           VARCHAR(100) NOT NULL,
     aktivan         BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ,
+    created_by      VARCHAR(255),
+    updated_by      VARCHAR(255)
 );
 
 CREATE UNIQUE INDEX uq_tipovi_casa_naziv ON tipovi_casa (COALESCE(skola_id::text, 'SISTEM'), LOWER(naziv));
@@ -98,7 +101,10 @@ CREATE TABLE metode_rada (
     skola_id        UUID REFERENCES skole(id) ON DELETE CASCADE,
     naziv           VARCHAR(100) NOT NULL,
     aktivan         BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ,
+    created_by      VARCHAR(255),
+    updated_by      VARCHAR(255)
 );
 
 CREATE UNIQUE INDEX uq_metode_rada_naziv ON metode_rada (COALESCE(skola_id::text, 'SISTEM'), LOWER(naziv));
