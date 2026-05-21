@@ -1,6 +1,5 @@
 package rs.skola.platforma.pp.domain;
 
-import tools.jackson.databind.JsonNode;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,6 +13,7 @@ import rs.skola.platforma.korisnici.domain.Korisnik;
 import rs.skola.platforma.odeljenja.domain.Odeljenje;
 
 import java.time.OffsetDateTime;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -42,7 +42,7 @@ public class PPIzvestaj extends TenantAwareEntity {
     /** Slobodno strukturiran JSONB sa svim sekcijama izvestaja. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "podaci_json", columnDefinition = "jsonb")
-    private JsonNode podaci;
+    private Map<String, Object> podaci;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
