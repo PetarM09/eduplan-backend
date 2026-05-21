@@ -1,0 +1,30 @@
+package rs.skola.platforma.planovi;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+
+import java.util.UUID;
+
+/**
+ * Asinhroni wrapper koji delegira na {@link OperativniPlanObradaService}. Razdvojen u
+ * zaseban bean da bi {@code @Transactional} u {@code obradi(...)} stvarno bio primenjen
+ * (Spring proxy intercept-uje SAMO pozive izmedju razlicitih bean-ova).
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class OperativniPlanIsporukaService {
+
+    private final OperativniPlanObradaService obradaService;
+
+    @Async
+    public void isporuciAsinhrono(UUID planId) {
+        try {
+            obradaService.obradi(planId);
+        } catch (Exception ex) {
+            log.error("Greska pri asinhronoj isporuci operativnog plana {}: {}", planId, ex.getMessage(), ex);
+        }
+    }
+}

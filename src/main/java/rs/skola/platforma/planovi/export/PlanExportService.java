@@ -23,6 +23,8 @@ import org.springframework.stereotype.Service;
 import rs.skola.platforma.common.exception.BaseException;
 import rs.skola.platforma.planovi.domain.GodisnjiPlan;
 import rs.skola.platforma.planovi.domain.GodisnjiPlanTema;
+import rs.skola.platforma.planovi.domain.OpStavka;
+import rs.skola.platforma.planovi.domain.OperativniPlan;
 import rs.skola.platforma.tenant.domain.Skola;
 import rs.skola.platforma.tenant.repo.SkolaRepository;
 
@@ -276,6 +278,180 @@ public class PlanExportService {
     private void dodajPar(PdfPTable t, String label, String value, Font lblFont, Font valFont) {
         t.addCell(new Phrase(label, lblFont));
         t.addCell(new Phrase(value, valFont));
+    }
+
+    // ==================== OPERATIVNI PLAN — WORD ====================
+
+    public byte[] generisiOperativniPlanWord(OperativniPlan plan) {
+        Skola skola = skolaRepository.findById(plan.getSkolaId()).orElse(null);
+        try (XWPFDocument doc = new XWPFDocument();
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+
+            XWPFParagraph titleP = doc.createParagraph();
+            titleP.setAlignment(ParagraphAlignment.CENTER);
+            XWPFRun titleR = titleP.createRun();
+            titleR.setBold(true);
+            titleR.setFontSize(16);
+            titleR.setText("OPERATIVNI PLAN RADA — " + nazivMeseca(plan.getMesec()));
+
+            // Zaglavlje sa osnovnim podacima
+            XWPFTable header = doc.createTable(2, 2);
+            header.setWidth("100%");
+            upisi(header.getRow(0).getCell(0), "Predmet: " + sigurno(plan.getPredmet().getNaziv()),
+                    true, 11, ParagraphAlignment.LEFT);
+            upisi(header.getRow(0).getCell(1), "Skolska godina: " + sigurno(plan.getSkolskaGodina()),
+                    true, 11, ParagraphAlignment.LEFT);
+            upisi(header.getRow(1).getCell(0), "Odeljenje: " + plan.getOdeljenje().label(),
+                    true, 11, ParagraphAlignment.LEFT);
+            upisi(header.getRow(1).getCell(1),
+                    "Nedeljni fond casova: " + (plan.getNedeljniFond() == null ? "-" : plan.getNedeljniFond()),
+                    true, 11, ParagraphAlignment.LEFT);
+            doc.createParagraph();
+
+            // Glavna tabela: 8 kolona kao u skolskom obrascu
+            List<OpStavka> stavke = plan.getStavke().stream()
+                    .sorted(Comparator.comparing(OpStavka::getRedniBrojCasa))
+                    .toList();
+            int kol = 8;
+            XWPFTable t = doc.createTable(stavke.size() + 1, kol);
+            t.setWidth("100%");
+            String[] hdr = {"Br. i naziv teme", "Ishodi", "R.br.", "Nastavna jedinica",
+                    "Tip casa", "Metode rada", "Medjupredmetno povezivanje", "Evaluacija"};
+            for (int i = 0; i < kol; i++) {
+                upisi(t.getRow(0).getCell(i), hdr[i], true, 9, ParagraphAlignment.CENTER);
+            }
+            for (int i = 0; i < stavke.size(); i++) {
+                OpStavka s = stavke.get(i);
+                XWPFTableRow row = t.getRow(i + 1);
+                upisi(row.getCell(0), s.getTema() == null ? "" : s.getTema().getNaziv(),
+                        false, 9, ParagraphAlignment.LEFT);
+                upisi(row.getCell(1),
+                        s.getIshodi().stream().map(io -> "• " + io.getOpis())
+                                .reduce((a, b) -> a + "\n" + b).orElse(""),
+                        false, 9, ParagraphAlignment.LEFT);
+                upisi(row.getCell(2), String.valueOf(s.getRedniBrojCasa()),
+                        false, 9, ParagraphAlignment.CENTER);
+                upisi(row.getCell(3), s.getNastavnaJedinica() == null ? "" : s.getNastavnaJedinica().getNaziv(),
+                        false, 9, ParagraphAlignment.LEFT);
+                upisi(row.getCell(4), s.getTipCasa() == null ? "" : s.getTipCasa().getNaziv(),
+                        false, 9, ParagraphAlignment.CENTER);
+                upisi(row.getCell(5), s.getMetodaRada() == null ? "" : s.getMetodaRada().getNaziv(),
+                        false, 9, ParagraphAlignment.LEFT);
+                upisi(row.getCell(6),
+                        s.getMedjupredmetno().stream()
+                                .map(mp -> mp.getPredmet().getNaziv()
+                                        + (mp.getOpisKompetencije() == null ? "" : ": " + mp.getOpisKompetencije()))
+                                .reduce((a, b) -> a + "\n" + b).orElse(""),
+                        false, 9, ParagraphAlignment.LEFT);
+                upisi(row.getCell(7), sigurno(s.getEvaluacija()), false, 9, ParagraphAlignment.LEFT);
+            }
+
+            doc.createParagraph();
+            XWPFParagraph samo = doc.createParagraph();
+            XWPFRun samoR = samo.createRun();
+            samoR.setBold(true);
+            samoR.setText("Samoprocena ishoda: ");
+            XWPFRun samoTxt = samo.createRun();
+            samoTxt.setText(sigurno(plan.getSamoprocenaIshoda()));
+
+            XWPFTable footer = doc.createTable(1, 2);
+            footer.setWidth("100%");
+            ukloniBorder(footer);
+            upisi(footer.getRow(0).getCell(0), "Datum predaje:", true, 10, ParagraphAlignment.LEFT);
+            upisi(footer.getRow(0).getCell(1),
+                    "Predmetni nastavnik: " + plan.getNastavnik().punoIme(),
+                    true, 10, ParagraphAlignment.RIGHT);
+
+            doc.write(out);
+            return out.toByteArray();
+        } catch (IOException ex) {
+            throw new ExportException("Greska pri generisanju Word fajla operativnog plana: " + ex.getMessage(), ex);
+        }
+    }
+
+    // ==================== OPERATIVNI PLAN — PDF ====================
+
+    public byte[] generisiOperativniPlanPdf(OperativniPlan plan) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Document doc = new Document(PageSize.A4.rotate());
+        try {
+            PdfWriter.getInstance(doc, out);
+            doc.open();
+
+            Font naslovFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, Color.BLACK);
+            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, Color.BLACK);
+            Font normalFont = FontFactory.getFont(FontFactory.HELVETICA, 9, Color.BLACK);
+
+            doc.add(new Paragraph("OPERATIVNI PLAN RADA — " + nazivMeseca(plan.getMesec()), naslovFont));
+            doc.add(new Paragraph("Predmet: " + sigurno(plan.getPredmet().getNaziv())
+                    + "   |   Odeljenje: " + plan.getOdeljenje().label()
+                    + "   |   Sk. godina: " + plan.getSkolskaGodina(), normalFont));
+            doc.add(new Paragraph("Nastavnik: " + plan.getNastavnik().punoIme()
+                    + "   |   Nedeljni fond: "
+                    + (plan.getNedeljniFond() == null ? "-" : plan.getNedeljniFond()), normalFont));
+            doc.add(new Paragraph(" "));
+
+            PdfPTable t = new PdfPTable(8);
+            t.setWidthPercentage(100);
+            t.setWidths(new float[]{2.5f, 3f, 0.6f, 3f, 1.2f, 1.5f, 2.5f, 2f});
+            String[] hdr = {"Br. i naziv teme", "Ishodi", "R.br.", "Nastavna jedinica",
+                    "Tip casa", "Metode rada", "Medjupredmetno", "Evaluacija"};
+            for (String h : hdr) {
+                PdfPCell c = new PdfPCell(new Phrase(h, headerFont));
+                c.setHorizontalAlignment(Element.ALIGN_CENTER);
+                t.addCell(c);
+            }
+            List<OpStavka> stavke = plan.getStavke().stream()
+                    .sorted(Comparator.comparing(OpStavka::getRedniBrojCasa))
+                    .toList();
+            for (OpStavka s : stavke) {
+                t.addCell(new Phrase(s.getTema() == null ? "" : s.getTema().getNaziv(), normalFont));
+                t.addCell(new Phrase(
+                        s.getIshodi().stream().map(io -> "• " + io.getOpis())
+                                .reduce((a, b) -> a + "\n" + b).orElse(""), normalFont));
+                PdfPCell rb = new PdfPCell(new Phrase(String.valueOf(s.getRedniBrojCasa()), normalFont));
+                rb.setHorizontalAlignment(Element.ALIGN_CENTER);
+                t.addCell(rb);
+                t.addCell(new Phrase(s.getNastavnaJedinica() == null ? "" : s.getNastavnaJedinica().getNaziv(), normalFont));
+                t.addCell(new Phrase(s.getTipCasa() == null ? "" : s.getTipCasa().getNaziv(), normalFont));
+                t.addCell(new Phrase(s.getMetodaRada() == null ? "" : s.getMetodaRada().getNaziv(), normalFont));
+                t.addCell(new Phrase(
+                        s.getMedjupredmetno().stream()
+                                .map(mp -> mp.getPredmet().getNaziv()
+                                        + (mp.getOpisKompetencije() == null ? "" : ": " + mp.getOpisKompetencije()))
+                                .reduce((a, b) -> a + "\n" + b).orElse(""), normalFont));
+                t.addCell(new Phrase(sigurno(s.getEvaluacija()), normalFont));
+            }
+            doc.add(t);
+
+            if (plan.getSamoprocenaIshoda() != null && !plan.getSamoprocenaIshoda().isBlank()) {
+                doc.add(new Paragraph(" "));
+                doc.add(new Paragraph("Samoprocena ishoda: " + plan.getSamoprocenaIshoda(), normalFont));
+            }
+
+            doc.close();
+            return out.toByteArray();
+        } catch (Exception ex) {
+            throw new ExportException("Greska pri generisanju PDF fajla operativnog plana: " + ex.getMessage(), ex);
+        }
+    }
+
+    private static String nazivMeseca(Short mesec) {
+        return switch (mesec == null ? 0 : mesec.intValue()) {
+            case 1 -> "Januar";
+            case 2 -> "Februar";
+            case 3 -> "Mart";
+            case 4 -> "April";
+            case 5 -> "Maj";
+            case 6 -> "Jun";
+            case 7 -> "Jul";
+            case 8 -> "Avgust";
+            case 9 -> "Septembar";
+            case 10 -> "Oktobar";
+            case 11 -> "Novembar";
+            case 12 -> "Decembar";
+            default -> "?";
+        };
     }
 
     public static class ExportException extends BaseException {
