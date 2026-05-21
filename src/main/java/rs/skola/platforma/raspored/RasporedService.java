@@ -89,11 +89,11 @@ public class RasporedService {
         // Index korisnika za brzi lookup
         Map<String, Korisnik> indeksKorisnika = indeksKorisnikaSkole(skolaId);
         Map<String, Odeljenje> indeksOdeljenja = indeksOdeljenjaSkole(skolaId, skolskaGodina);
+        int odeljenjaPreUvoza = indeksOdeljenja.size();
 
         List<String> nemapirani = new ArrayList<>();
         int mapirano = 0;
         int kreiranihStavki = 0;
-        int kreiranihOdeljenja = 0;
 
         for (ParsedRasporedRed red : redovi) {
             Korisnik nastavnik = pronadjiKorisnika(indeksKorisnika, red.nastavnikLabel());
@@ -104,26 +104,18 @@ public class RasporedService {
             mapirano++;
 
             for (ParsedRasporedRed.ParsedStavka s : red.stavke()) {
-                Odeljenje od = nadjiIliKreirajOdeljenje(indeksOdeljenja, skolaId, skolskaGodina, s.odeljenjeLabel());
-                if (od == null) continue;
-                if (od.getId() == null) {
-                    // novokreirano i sacuvano u nadjiIliKreirajOdeljenje
-                    kreiranihOdeljenja++;
+                // Format "1-1/1-5" znaci da nastavnik u istom casu predaje dva odeljenja
+                // (spojeni grupni cas). Kreiramo jednu RasporedStavka po odeljenju.
+                String[] delovi = s.odeljenjeLabel().split("/");
+                for (String deo : delovi) {
+                    Odeljenje od = nadjiIliKreirajOdeljenje(indeksOdeljenja, skolaId, skolskaGodina, deo.trim());
+                    if (od == null) continue;
+                    kreiranihStavki += sacuvajStavku(verzija, nastavnik, od, s, skolaId) ? 1 : 0;
                 }
-                RasporedStavka stavka = RasporedStavka.builder()
-                        .verzija(verzija)
-                        .korisnik(nastavnik)
-                        .odeljenje(od)
-                        .predmetLabel(null)
-                        .dan(s.dan())
-                        .cas(s.cas())
-                        .build();
-                stavka.setSkolaId(skolaId);
-                stavkaRepo.save(stavka);
-                kreiranihStavki++;
             }
         }
 
+        int kreiranihOdeljenja = indeksOdeljenja.size() - odeljenjaPreUvoza;
         return new UvozRasporedaResponse(
                 verzija.getId(),
                 verzija.getNaziv(),
@@ -134,6 +126,21 @@ public class RasporedService {
                 kreiranihOdeljenja,
                 nemapirani
         );
+    }
+
+    private boolean sacuvajStavku(VerzijaRasporeda verzija, Korisnik nastavnik, Odeljenje od,
+                                   ParsedRasporedRed.ParsedStavka s, UUID skolaId) {
+        RasporedStavka stavka = RasporedStavka.builder()
+                .verzija(verzija)
+                .korisnik(nastavnik)
+                .odeljenje(od)
+                .predmetLabel(null)
+                .dan(s.dan())
+                .cas(s.cas())
+                .build();
+        stavka.setSkolaId(skolaId);
+        stavkaRepo.save(stavka);
+        return true;
     }
 
     @Transactional(readOnly = true)
@@ -172,24 +179,37 @@ public class RasporedService {
     }
 
     private List<String> kljuceviKorisnika(Korisnik k) {
-        String ime = (k.getIme() == null ? "" : k.getIme()).toLowerCase().trim();
-        String prez = (k.getPrezime() == null ? "" : k.getPrezime()).toLowerCase().trim();
+        String ime = normalizujZaPoredjenje(k.getIme());
+        String prez = normalizujZaPoredjenje(k.getPrezime());
         return List.of(
                 (ime + " " + prez).trim(),
                 (prez + " " + ime).trim(),
                 (prez + ", " + ime).trim(),
-                k.getUsername().toLowerCase()
+                normalizujZaPoredjenje(k.getUsername())
         );
     }
 
     private Korisnik pronadjiKorisnika(Map<String, Korisnik> indeks, String labelaIzXml) {
         if (labelaIzXml == null) return null;
-        String norm = labelaIzXml.toLowerCase().trim();
+        String norm = normalizujZaPoredjenje(labelaIzXml);
         Korisnik direktan = indeks.get(norm);
         if (direktan != null) return direktan;
         // Pokusaj da svedemo na "ime prezime" — uklanjamo zarez i visestruke razmake
         String pokusaj = norm.replace(",", " ").replaceAll("\\s+", " ");
         return indeks.get(pokusaj);
+    }
+
+    /**
+     * Pripreman tekst za fuzzy poredjenje: lowercase, trim, transliteracija srpskih
+     * latinickih dijakritika (č/ć/š/ž → c/c/s/z, đ → dj). Bez ovoga, "Kanlić Jelena"
+     * iz XML-a ne moze da se sparu sa korisnickim profilom "Kanlic Jelena" u bazi.
+     */
+    private static String normalizujZaPoredjenje(String s) {
+        if (s == null) return "";
+        return s.toLowerCase().trim()
+                .replace("č", "c").replace("ć", "c")
+                .replace("š", "s").replace("ž", "z")
+                .replace("đ", "dj");
     }
 
     private Map<String, Odeljenje> indeksOdeljenjaSkole(UUID skolaId, String skolskaGodina) {

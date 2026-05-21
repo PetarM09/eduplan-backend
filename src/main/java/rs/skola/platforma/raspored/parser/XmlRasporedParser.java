@@ -61,7 +61,6 @@ public class XmlRasporedParser {
 
     private List<ParsedRasporedRed> parseRows(XMLEventReader reader) throws XMLStreamException {
         List<ParsedRasporedRed> redovi = new ArrayList<>();
-        boolean preskocenoZaglavlje = false;
 
         while (reader.hasNext()) {
             XMLEvent ev = reader.nextEvent();
@@ -71,19 +70,11 @@ public class XmlRasporedParser {
 
             ParsedRasporedRed red = parseRow(reader);
             if (red == null) continue;
-
-            // Prvi red sa nepopunjenim stavkama tretiramo kao zaglavlje.
-            if (!preskocenoZaglavlje && red.stavke().isEmpty()
-                    && (red.nastavnikLabel() == null || red.nastavnikLabel().isBlank()
-                    || izgledaKaoZaglavlje(red.nastavnikLabel()))) {
-                preskocenoZaglavlje = true;
-                continue;
-            }
-            preskocenoZaglavlje = true;
-
-            if (red.nastavnikLabel() == null || red.nastavnikLabel().isBlank()) {
-                continue;
-            }
+            // "Data row" je red sa nastavnikom u prvoj koloni i bar jednom prepoznatljivom
+            // oznakom odeljenja u kolonama 2..36. Sve zaglavlja (naslovi, dani, brojevi
+            // casova) imaju prazna polja na tim mestima i filtriraju se sama.
+            if (red.nastavnikLabel() == null || red.nastavnikLabel().isBlank()) continue;
+            if (red.stavke().isEmpty()) continue;
             redovi.add(red);
         }
         return redovi;
@@ -121,28 +112,36 @@ public class XmlRasporedParser {
         return null;
     }
 
-    /** U Cell-u procita prvi <Data> sadrzaj (ako postoji) i pozicionira se na </Cell>. */
+    /**
+     * Cita sav tekst unutar <Data> elementa Cell-a, ukljucujuci ugnjezdene HTML
+     * formatne tagove (Font, B, I...) koje SpreadsheetML 2003 obicno koristi.
+     * Pozicionira se na </Cell> kad zavrsi.
+     */
     private String procitajData(XMLEventReader reader) throws XMLStreamException {
-        String vrednost = null;
+        StringBuilder buffer = null;
+        boolean unutarData = false;
         while (reader.hasNext()) {
             XMLEvent ev = reader.nextEvent();
             if (ev.isEndElement() && isLocal(ev.asEndElement(), "Cell")) {
-                return vrednost;
+                return buffer == null ? null : buffer.toString();
             }
             if (ev.isStartElement() && isLocal(ev.asStartElement(), "Data")) {
-                XMLEvent next = reader.nextEvent();
-                if (next.isCharacters()) {
-                    Characters chars = next.asCharacters();
-                    vrednost = chars.getData();
-                }
-                // konzumiraj </Data>
-                while (reader.hasNext()) {
-                    XMLEvent eo = reader.nextEvent();
-                    if (eo.isEndElement() && isLocal(eo.asEndElement(), "Data")) break;
+                unutarData = true;
+                buffer = new StringBuilder();
+                continue;
+            }
+            if (ev.isEndElement() && isLocal(ev.asEndElement(), "Data")) {
+                unutarData = false;
+                continue;
+            }
+            if (unutarData && ev.isCharacters()) {
+                Characters chars = ev.asCharacters();
+                if (!chars.isWhiteSpace() || chars.getData().contains(" ")) {
+                    buffer.append(chars.getData());
                 }
             }
         }
-        return vrednost;
+        return buffer == null ? null : buffer.toString();
     }
 
     private boolean isLocal(StartElement start, String localName) {
@@ -166,13 +165,6 @@ public class XmlRasporedParser {
 
     private static String normalizuj(String s) {
         return s == null ? null : s.trim().replaceAll("\\s+", " ");
-    }
-
-    private static boolean izgledaKaoZaglavlje(String s) {
-        if (s == null) return false;
-        String n = s.trim().toLowerCase();
-        return n.equals("nastavnik") || n.equals("predmet") || n.equals("ime") || n.equals("prezime")
-                || n.contains("ponedeljak") || n.contains("utorak");
     }
 
     private static Map<Integer, DanCas> mapaKolona() {
