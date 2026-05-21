@@ -36,4 +36,32 @@ public interface RasporedStavkaRepository extends JpaRepository<RasporedStavka, 
     List<RasporedStavka> rasporedDana(@Param("skolaId") UUID skolaId,
                                       @Param("verzijaId") UUID verzijaId,
                                       @Param("dan") rs.skola.platforma.raspored.domain.Dan dan);
+
+    /** UUID-ovi nastavnika koji imaju cas u datom dan/cas iz aktivne verzije rasporeda. */
+    @Query("""
+            SELECT DISTINCT rs.korisnik.id FROM RasporedStavka rs
+            WHERE rs.skolaId = :skolaId
+              AND rs.verzija.id = :verzijaId
+              AND rs.dan = :dan
+              AND rs.cas = :cas
+            """)
+    List<UUID> zauzetiNastavnici(@Param("skolaId") UUID skolaId,
+                                 @Param("verzijaId") UUID verzijaId,
+                                 @Param("dan") rs.skola.platforma.raspored.domain.Dan dan,
+                                 @Param("cas") Short cas);
+
+    /** Sve stavke nastavnika u datom danu (za prijavu odsustva) iz aktivne verzije. */
+    @Query("""
+            SELECT rs FROM RasporedStavka rs
+            LEFT JOIN FETCH rs.odeljenje
+            WHERE rs.skolaId = :skolaId
+              AND rs.verzija.id = :verzijaId
+              AND rs.korisnik.id = :korisnikId
+              AND rs.dan = :dan
+            ORDER BY rs.cas ASC
+            """)
+    List<RasporedStavka> casoviNastavnikaPoDanu(@Param("skolaId") UUID skolaId,
+                                                @Param("verzijaId") UUID verzijaId,
+                                                @Param("korisnikId") UUID korisnikId,
+                                                @Param("dan") rs.skola.platforma.raspored.domain.Dan dan);
 }
