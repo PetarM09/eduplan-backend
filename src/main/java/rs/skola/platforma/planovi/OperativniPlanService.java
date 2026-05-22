@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import rs.skola.platforma.auth.security.CustomUserDetails;
 import rs.skola.platforma.common.exception.ConflictException;
 import rs.skola.platforma.common.exception.ResourceNotFoundException;
@@ -85,7 +87,11 @@ public class OperativniPlanService {
         plan.setSamoprocenaIshoda(req.samoprocenaIshoda());
         plan.setNapomene(req.napomene());
 
+        // Brisemo stare stavke pre dodavanja novih + flush, da Hibernate ne pokrene
+        // INSERT pre DELETE-a (UNIQUE constraint na (plan, redniBrojCasa) bi pucao).
         plan.getStavke().clear();
+        planRepo.saveAndFlush(plan);
+
         Set<Short> rbCasa = new HashSet<>();
         for (KreirajOperativniPlanRequest.StavkaCasaRequest s : req.stavke()) {
             if (!rbCasa.add(s.redniBrojCasa())) {
@@ -95,7 +101,15 @@ public class OperativniPlanService {
         }
 
         plan = planRepo.save(plan);
-        isporukaService.isporuciAsinhrono(plan.getId());
+        UUID planId = plan.getId();
+        // Async isporuka mora da pocne TEK NAKON commit-a — inace async thread otvori
+        // novu konekciju i ne vidi plan koji jos uvek nije committed.
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                isporukaService.isporuciAsinhrono(planId);
+            }
+        });
         return toResponse(plan);
     }
 
@@ -160,7 +174,13 @@ public class OperativniPlanService {
             kopija.getStavke().add(nova);
         }
         kopija = planRepo.save(kopija);
-        isporukaService.isporuciAsinhrono(kopija.getId());
+        UUID novId = kopija.getId();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                isporukaService.isporuciAsinhrono(novId);
+            }
+        });
         return toResponse(kopija);
     }
 

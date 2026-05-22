@@ -10,6 +10,13 @@ spring:
     username: test
     password: test
 
+# Iskljucujemo mail health probe — JavaMailSender je mockovan u IT,
+# pa MailHealthIndicator inace fail-uje ApplicationContext startup
+management:
+  health:
+    mail:
+      enabled: false
+
 app:
   jwt:
     secret: testJwtSecretKljucKojiJeDovoljnoDugackiZaHS256Algoritam!!

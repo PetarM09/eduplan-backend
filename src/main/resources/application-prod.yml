@@ -1,0 +1,80 @@
+# Produkcioni profil. Sve osetljive vrednosti dolaze iz env varijabli (12-Factor App).
+# Aktivira se sa: SPRING_PROFILES_ACTIVE=prod
+
+spring:
+  datasource:
+    # Obavezno postavi DB_URL/DB_USER/DB_PASS u produkciji
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 10
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+        generate_statistics: false
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: false
+
+  threads:
+    virtual:
+      enabled: true
+
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+server:
+  port: ${SERVER_PORT:8080}
+  compression:
+    enabled: true
+  forward-headers-strategy: framework
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db
+  health:
+    mail:
+      enabled: true
+
+logging:
+  level:
+    root: INFO
+    rs.skola.platforma: INFO
+    org.hibernate.SQL: WARN
+    org.springframework.security: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{korisnikId:-anon}] [%X{skolaId:-no-tenant}] %logger{36} - %msg%n"
+
+app:
+  jwt:
+    # JWT_SECRET MORA biti tajna dugacka bar 64 karaktera u produkciji
+    access-token-expiration-minutes: ${JWT_ACCESS_EXP:15}
+    refresh-token-expiration-days: ${JWT_REFRESH_EXP:7}
+  storage:
+    base-dir: ${STORAGE_DIR:/app/storage}
+  async:
+    core-pool-size: 8
+    max-pool-size: 32
+    queue-capacity: 500

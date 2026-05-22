@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import rs.skola.platforma.auth.security.CustomUserDetails;
 import rs.skola.platforma.common.exception.ConflictException;
 import rs.skola.platforma.common.exception.ResourceNotFoundException;
@@ -92,15 +94,26 @@ public class GodisnjiPlanService {
         plan.setDodatniRad(req.dodatniRad());
         plan.setNapomene(req.napomene());
 
+        // Brisemo stare veze pre dodavanja novih i flush-ujemo da Hibernate ne pokusa
+        // INSERT pre DELETE-a (sto bi pokrenulo UNIQUE constraint violation pri idempotent re-save-u).
         plan.getTeme().clear();
+        planRepo.saveAndFlush(plan);
+
         for (KreirajGodisnjiPlanRequest.StavkaTemeRequest stavka : req.teme()) {
             GodisnjiPlanTema gpt = prepraviStavku(predmet.getId(), plan, stavka);
             plan.getTeme().add(gpt);
         }
 
         plan = planRepo.save(plan);
-        // Predaja Word/PDF generisanja + mail u asinhroni proces — nastavnik ne ceka.
-        isporukaService.isporuciAsinhrono(plan.getId());
+        UUID planId = plan.getId();
+        // Async isporuka tek nakon commit-a — inace bi @Async thread otvorio novu
+        // konekciju i ne bi video plan (test/integracioni scenario fail-uje).
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                isporukaService.isporuciAsinhrono(planId);
+            }
+        });
         return toResponse(plan);
     }
 
