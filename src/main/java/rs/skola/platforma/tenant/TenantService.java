@@ -20,6 +20,7 @@ import rs.skola.platforma.tenant.web.KreirajSkoluRequest;
 import rs.skola.platforma.tenant.web.SkolaMapper;
 import rs.skola.platforma.tenant.web.SkolaResponse;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -54,10 +55,34 @@ public class TenantService {
                 .naziv(req.naziv())
                 .grad(req.grad())
                 .adresa(req.adresa())
-                .mailPlanovi(req.mailPlanovi())
                 .aktivan(true)
+                .vaziDo(req.vaziDo())
                 .build();
         return skolaMapper.toResponse(skolaRepository.save(s));
+    }
+
+    @Transactional
+    public SkolaResponse aktivirajSkolu(UUID skolaId) {
+        Skola s = skolaRepository.findById(skolaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Skola", skolaId));
+        s.setAktivan(true);
+        return skolaMapper.toResponse(s);
+    }
+
+    @Transactional
+    public SkolaResponse deaktivirajSkolu(UUID skolaId) {
+        Skola s = skolaRepository.findById(skolaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Skola", skolaId));
+        s.setAktivan(false);
+        return skolaMapper.toResponse(s);
+    }
+
+    @Transactional
+    public SkolaResponse postaviVaziDo(UUID skolaId, LocalDate vaziDo) {
+        Skola s = skolaRepository.findById(skolaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Skola", skolaId));
+        s.setVaziDo(vaziDo);
+        return skolaMapper.toResponse(s);
     }
 
     @Transactional

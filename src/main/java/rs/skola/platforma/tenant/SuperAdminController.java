@@ -15,6 +15,7 @@ import rs.skola.platforma.korisnici.web.KreirajKorisnikaRequest;
 import rs.skola.platforma.tenant.web.KreirajSkoluRequest;
 import rs.skola.platforma.tenant.web.SkolaResponse;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -47,6 +48,29 @@ public class SuperAdminController {
                                                               @Valid @RequestBody KreirajKorisnikaRequest req) {
         return ApiResponse.ok(tenantService.kreirajKoordinatora(id, req));
     }
+
+    // -------- Lifecycle skole --------
+
+    @PostMapping("/skole/{id}/aktiviraj")
+    @Operation(summary = "Reaktivira skolu (login svih korisnika ponovo dozvoljen)")
+    public ApiResponse<SkolaResponse> aktivirajSkolu(@PathVariable UUID id) {
+        return ApiResponse.ok(tenantService.aktivirajSkolu(id));
+    }
+
+    @PostMapping("/skole/{id}/deaktiviraj")
+    @Operation(summary = "Deaktivira skolu (svi korisnici dobijaju 401 pri login-u)")
+    public ApiResponse<SkolaResponse> deaktivirajSkolu(@PathVariable UUID id) {
+        return ApiResponse.ok(tenantService.deaktivirajSkolu(id));
+    }
+
+    @PatchMapping("/skole/{id}/vazi-do")
+    @Operation(summary = "Postavlja ili uklanja datum automatske deaktivacije (null = bez ogranicenja)")
+    public ApiResponse<SkolaResponse> postaviVaziDo(@PathVariable UUID id,
+                                                     @RequestBody PostaviVaziDoRequest req) {
+        return ApiResponse.ok(tenantService.postaviVaziDo(id, req.vaziDo()));
+    }
+
+    public record PostaviVaziDoRequest(LocalDate vaziDo) {}
 
     // -------- Korisnici po skoli --------
 

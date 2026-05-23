@@ -18,7 +18,9 @@ import rs.skola.platforma.auth.web.TokenPair;
 import rs.skola.platforma.common.exception.UnauthorizedException;
 import rs.skola.platforma.korisnici.domain.Korisnik;
 import rs.skola.platforma.korisnici.repo.KorisnikRepository;
+import rs.skola.platforma.tenant.domain.Skola;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
@@ -41,6 +43,7 @@ public class AuthService {
 
             Korisnik k = korisnikRepository.findById(ud.id())
                     .orElseThrow(() -> new UnauthorizedException("Nalog ne postoji"));
+            proveriSkolu(k);
             k.setPoslednjiLogin(OffsetDateTime.now());
 
             return izdajPar(ud);
@@ -64,6 +67,7 @@ public class AuthService {
         if (!k.isAktivan()) {
             throw new UnauthorizedException("Nalog je deaktiviran");
         }
+        proveriSkolu(k);
 
         // Rotiramo refresh token: stari postaje revoked, klijent dobija novi.
         rt.setRevoked(true);
@@ -85,6 +89,21 @@ public class AuthService {
         if (refreshToken == null || refreshToken.isBlank()) return;
         refreshTokenRepository.findByTokenHash(jwtProvider.sha256(refreshToken))
                 .ifPresent(rt -> rt.setRevoked(true));
+    }
+
+    /**
+     * Odbija prijavu kada je skola deaktivirana ili joj je istekao datum vazenja.
+     * SUPER_ADMIN nema povezanu skolu (skola == null) pa prolazi proveru.
+     */
+    private void proveriSkolu(Korisnik k) {
+        Skola s = k.getSkola();
+        if (s == null) return; // SUPER_ADMIN
+        if (!s.jeAktivnaNa(LocalDate.now())) {
+            String razlog = !s.isAktivan()
+                    ? "Skola je deaktivirana. Obrati se administratoru platforme."
+                    : "Pristup skoli je istekao (%s). Obrati se administratoru platforme.".formatted(s.getVaziDo());
+            throw new UnauthorizedException(razlog);
+        }
     }
 
     private TokenPair izdajPar(CustomUserDetails ud) {

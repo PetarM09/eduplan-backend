@@ -1,5 +1,6 @@
 package rs.skola.platforma.tenant.web;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 public record SkolaResponse(
@@ -8,5 +9,6 @@ public record SkolaResponse(
         String grad,
         String adresa,
         String mailPlanovi,
-        boolean aktivan
+        boolean aktivan,
+        LocalDate vaziDo
 ) {}
