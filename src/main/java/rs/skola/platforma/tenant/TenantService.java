@@ -1,11 +1,13 @@
 package rs.skola.platforma.tenant;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import rs.skola.platforma.common.exception.ConflictException;
 import rs.skola.platforma.common.exception.ResourceNotFoundException;
+import rs.skola.platforma.common.exception.ValidationException;
 import rs.skola.platforma.korisnici.domain.Korisnik;
 import rs.skola.platforma.korisnici.domain.Uloga;
 import rs.skola.platforma.korisnici.repo.KorisnikRepository;
@@ -84,5 +86,61 @@ public class TenantService {
                 .aktivan(true)
                 .build();
         return korisnikMapper.toResponse(korisnikRepository.save(k));
+    }
+
+    @Transactional(readOnly = true)
+    public List<KorisnikResponse> korisniciSkole(UUID skolaId) {
+        if (!skolaRepository.existsById(skolaId)) {
+            throw new ResourceNotFoundException("Skola", skolaId);
+        }
+        return korisnikRepository.findAllBySkolaIdOrderByPrezimeAscImeAsc(skolaId).stream()
+                .map(korisnikMapper::toResponse)
+                .toList();
+    }
+
+    @Transactional
+    public KorisnikResponse aktivirajKorisnika(UUID korisnikId) {
+        Korisnik k = nadjiUnutarSkole(korisnikId);
+        k.setAktivan(true);
+        return korisnikMapper.toResponse(k);
+    }
+
+    @Transactional
+    public KorisnikResponse deaktivirajKorisnika(UUID korisnikId) {
+        Korisnik k = nadjiUnutarSkole(korisnikId);
+        k.setAktivan(false);
+        return korisnikMapper.toResponse(k);
+    }
+
+    @Transactional
+    public KorisnikResponse promeniUlogu(UUID korisnikId, Uloga novaUloga) {
+        if (novaUloga == Uloga.SUPER_ADMIN) {
+            throw new ValidationException("Ne moze se dodeliti SUPER_ADMIN uloga unutar skole");
+        }
+        Korisnik k = nadjiUnutarSkole(korisnikId);
+        k.setUloga(novaUloga);
+        return korisnikMapper.toResponse(k);
+    }
+
+    @Transactional
+    public void obrisiKorisnika(UUID korisnikId) {
+        Korisnik k = nadjiUnutarSkole(korisnikId);
+        try {
+            korisnikRepository.delete(k);
+            korisnikRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new ConflictException(
+                    "Korisnik ima vezane planove, izvestaje ili druge zapise. " +
+                            "Deaktiviraj ga umesto brisanja.");
+        }
+    }
+
+    private Korisnik nadjiUnutarSkole(UUID korisnikId) {
+        Korisnik k = korisnikRepository.findById(korisnikId)
+                .orElseThrow(() -> new ResourceNotFoundException("Korisnik", korisnikId));
+        if (k.getUloga() == Uloga.SUPER_ADMIN || k.getSkola() == null) {
+            throw new ValidationException("Operacija nije dozvoljena nad SUPER_ADMIN nalogom");
+        }
+        return k;
     }
 }
