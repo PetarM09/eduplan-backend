@@ -77,4 +77,6 @@ public interface RasporedStavkaRepository extends JpaRepository<RasporedStavka, 
     List<RasporedStavka> sveZaOdeljenje(@Param("skolaId") UUID skolaId,
                                          @Param("verzijaId") UUID verzijaId,
                                          @Param("odeljenjeId") UUID odeljenjeId);
+
+    long countBySkolaIdAndVerzija_Id(UUID skolaId, UUID verzijaId);
 }

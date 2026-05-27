@@ -1,8 +1,10 @@
 package rs.skola.platforma.odeljenja;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import rs.skola.platforma.common.exception.ConflictException;
 import rs.skola.platforma.common.exception.ResourceNotFoundException;
 import rs.skola.platforma.common.exception.TenantViolationException;
 import rs.skola.platforma.common.tenant.TenantContext;
@@ -89,6 +91,24 @@ public class OdeljenjeService {
         }
         o.setAktivan(false);
         odeljenjeRepo.save(o);
+    }
+
+    @Transactional
+    public void obrisi(UUID id) {
+        UUID skolaId = TenantContext.require();
+        Odeljenje o = odeljenjeRepo.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Odeljenje", id));
+        if (!skolaId.equals(o.getSkolaId())) {
+            throw new TenantViolationException();
+        }
+        try {
+            odeljenjeRepo.delete(o);
+            odeljenjeRepo.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new ConflictException(
+                    "Odeljenje ima vezane planove, izvestaje ili stavke rasporeda. " +
+                            "Deaktiviraj ga umesto brisanja.");
+        }
     }
 
     private OdeljenjeResponse toResponse(Odeljenje o) {

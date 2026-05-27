@@ -65,13 +65,18 @@ public class RotacijaService {
         // Grupisi po terminu (dan, cas). Profesor se identifikuje po imenu (label)
         // iz rasporeda — distinct po terminu, jer neki XML formati ubacuju istog
         // profesora vise puta za isti termin (npr. "4-1/4-1").
+        // Ne koristimo Map.merge jer ne dozvoljava null vrednost (kad korisnik
+        // nije mapiran u sistemu), pa rucno radimo "put-if-better".
         Map<TerminKljuc, Map<String, UUID>> poTerminu = new LinkedHashMap<>();
         for (RasporedStavka s : stavke) {
             String label = s.getNastavnikLabel();
+            if (label == null) continue;
             UUID korisnikId = s.getKorisnik() == null ? null : s.getKorisnik().getId();
-            poTerminu
-                    .computeIfAbsent(new TerminKljuc(s.getDan(), s.getCas()), key -> new LinkedHashMap<>())
-                    .merge(label, korisnikId, (postojeci, novi) -> postojeci != null ? postojeci : novi);
+            Map<String, UUID> mapaTermina = poTerminu.computeIfAbsent(
+                    new TerminKljuc(s.getDan(), s.getCas()), key -> new LinkedHashMap<>());
+            if (!mapaTermina.containsKey(label) || (mapaTermina.get(label) == null && korisnikId != null)) {
+                mapaTermina.put(label, korisnikId);
+            }
         }
 
         List<DetekcijaVezbiResponse.TerminVezbi> sviTermini = new ArrayList<>();
@@ -90,8 +95,11 @@ public class RotacijaService {
             if (profesoriMap.size() >= 2) {
                 vezbeTermini.add(termin);
                 for (Map.Entry<String, UUID> p : profesoriMap.entrySet()) {
-                    idPoLabelu.merge(p.getKey(), p.getValue(),
-                            (postojeci, novi) -> postojeci != null ? postojeci : novi);
+                    // Rucno put-if-better umesto Map.merge — dozvoljen je null UUID
+                    UUID existing = idPoLabelu.get(p.getKey());
+                    if (!idPoLabelu.containsKey(p.getKey()) || (existing == null && p.getValue() != null)) {
+                        idPoLabelu.put(p.getKey(), p.getValue());
+                    }
                     brojCasovaPoLabelu.merge(p.getKey(), 1, Integer::sum);
                 }
             }

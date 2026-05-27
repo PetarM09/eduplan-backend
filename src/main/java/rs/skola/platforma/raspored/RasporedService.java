@@ -154,6 +154,48 @@ public class RasporedService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<rs.skola.platforma.raspored.web.VerzijaResponse> sveVerzije() {
+        UUID skolaId = TenantContext.require();
+        return verzijaRepo.findAllBySkolaIdOrderByCreatedAtDesc(skolaId).stream()
+                .map(v -> new rs.skola.platforma.raspored.web.VerzijaResponse(
+                        v.getId(),
+                        v.getNaziv(),
+                        v.getSkolskaGodina(),
+                        v.getDatumOd(),
+                        v.isAktivan(),
+                        stavkaRepo.countBySkolaIdAndVerzija_Id(skolaId, v.getId()),
+                        v.getCreatedAt()
+                ))
+                .toList();
+    }
+
+    @Transactional
+    public rs.skola.platforma.raspored.web.VerzijaResponse aktivirajVerziju(UUID verzijaId) {
+        UUID skolaId = TenantContext.require();
+        VerzijaRasporeda v = verzijaRepo.findById(verzijaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Verzija rasporeda", verzijaId));
+        if (!skolaId.equals(v.getSkolaId())) {
+            throw new rs.skola.platforma.common.exception.TenantViolationException();
+        }
+        verzijaRepo.deaktivirajSve(skolaId);
+        v.setAktivan(true);
+        return new rs.skola.platforma.raspored.web.VerzijaResponse(
+                v.getId(), v.getNaziv(), v.getSkolskaGodina(), v.getDatumOd(),
+                true, stavkaRepo.countBySkolaIdAndVerzija_Id(skolaId, v.getId()), v.getCreatedAt());
+    }
+
+    @Transactional
+    public void obrisiVerziju(UUID verzijaId) {
+        UUID skolaId = TenantContext.require();
+        VerzijaRasporeda v = verzijaRepo.findById(verzijaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Verzija rasporeda", verzijaId));
+        if (!skolaId.equals(v.getSkolaId())) {
+            throw new rs.skola.platforma.common.exception.TenantViolationException();
+        }
+        verzijaRepo.delete(v);
+    }
+
     private RasporedStavkaResponse toResponse(RasporedStavka rs) {
         Korisnik k = rs.getKorisnik();
         Odeljenje od = rs.getOdeljenje();

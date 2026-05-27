@@ -14,8 +14,10 @@ import rs.skola.platforma.auth.security.CustomUserDetails;
 import rs.skola.platforma.common.web.ApiResponse;
 import rs.skola.platforma.raspored.web.RasporedStavkaResponse;
 import rs.skola.platforma.raspored.web.UvozRasporedaResponse;
+import rs.skola.platforma.raspored.web.VerzijaResponse;
 
 import java.util.List;
+import java.util.UUID;
 
 @Tag(name = "Raspored", description = "Uvoz XML rasporeda, prikaz mog rasporeda i rasporeda dana")
 @RestController
@@ -44,5 +46,27 @@ public class RasporedController {
     @Operation(summary = "Sopstveni raspored (aktivna verzija)")
     public ApiResponse<List<RasporedStavkaResponse>> mojRaspored(@AuthenticationPrincipal CustomUserDetails ja) {
         return ApiResponse.ok(service.mojRaspored(ja));
+    }
+
+    @GetMapping("/verzije")
+    @PreAuthorize("hasAnyRole('KOORDINATOR','DIREKTOR','ADMIN')")
+    @Operation(summary = "Sve verzije rasporeda za skolu (najnovije prvo)")
+    public ApiResponse<List<VerzijaResponse>> verzije() {
+        return ApiResponse.ok(service.sveVerzije());
+    }
+
+    @PostMapping("/verzije/{id}/aktiviraj")
+    @PreAuthorize("hasAnyRole('KOORDINATOR','ADMIN')")
+    @Operation(summary = "Aktivira datu verziju i deaktivira ostale")
+    public ApiResponse<VerzijaResponse> aktivirajVerziju(@PathVariable UUID id) {
+        return ApiResponse.ok(service.aktivirajVerziju(id));
+    }
+
+    @DeleteMapping("/verzije/{id}")
+    @PreAuthorize("hasRole('KOORDINATOR')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Brise verziju rasporeda (ON DELETE CASCADE brise sve stavke)")
+    public void obrisiVerziju(@PathVariable UUID id) {
+        service.obrisiVerziju(id);
     }
 }

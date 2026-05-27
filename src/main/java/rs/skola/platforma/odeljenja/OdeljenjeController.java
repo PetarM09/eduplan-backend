@@ -44,11 +44,19 @@ public class OdeljenjeController {
         return ApiResponse.ok(service.postaviStaresinu(id, staresinaId));
     }
 
+    @PostMapping("/{id}/deaktiviraj")
+    @PreAuthorize("hasRole('KOORDINATOR')")
+    @Operation(summary = "Deaktivira odeljenje (preporuceno ako ima vezane podatke)")
+    public ApiResponse<Void> deaktiviraj(@PathVariable UUID id) {
+        service.deaktiviraj(id);
+        return ApiResponse.ok(null);
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('KOORDINATOR')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Deaktivira odeljenje")
-    public void deaktiviraj(@PathVariable UUID id) {
-        service.deaktiviraj(id);
+    @Operation(summary = "Brise odeljenje ako nema vezane podatke (planovi, izvestaji, raspored)")
+    public void obrisi(@PathVariable UUID id) {
+        service.obrisi(id);
     }
 }
