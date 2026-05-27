@@ -62,30 +62,36 @@ public class RotacijaService {
 
         List<RasporedStavka> stavke = stavkaRepo.sveZaOdeljenje(skolaId, verzija.getId(), odeljenjeId);
 
-        // Grupisi po terminu (dan, cas) i ostavi samo termine sa 2+ profesora.
-        Map<TerminKljuc, List<RasporedStavka>> poTerminu = new LinkedHashMap<>();
+        // Grupisi po terminu (dan, cas). Distinct profesori po terminu — neki XML
+        // formati ubace istog profesora vise puta za isti termin (npr. "4-1/4-1").
+        Map<TerminKljuc, Map<UUID, String>> poTerminu = new LinkedHashMap<>();
         for (RasporedStavka s : stavke) {
-            poTerminu.computeIfAbsent(new TerminKljuc(s.getDan(), s.getCas()), k -> new ArrayList<>()).add(s);
+            Korisnik k = s.getKorisnik();
+            poTerminu
+                    .computeIfAbsent(new TerminKljuc(s.getDan(), s.getCas()), key -> new LinkedHashMap<>())
+                    .putIfAbsent(k.getId(), k.punoIme());
         }
 
-        List<DetekcijaVezbiResponse.TerminVezbi> termini = new ArrayList<>();
+        List<DetekcijaVezbiResponse.TerminVezbi> sviTermini = new ArrayList<>();
+        List<DetekcijaVezbiResponse.TerminVezbi> vezbeTermini = new ArrayList<>();
         Map<UUID, Integer> brojCasovaPoProfesoru = new LinkedHashMap<>();
         Map<UUID, String> imenaProfesora = new HashMap<>();
 
-        for (Map.Entry<TerminKljuc, List<RasporedStavka>> e : poTerminu.entrySet()) {
-            List<RasporedStavka> grupa = e.getValue();
-            if (grupa.size() < 2) continue;
+        for (Map.Entry<TerminKljuc, Map<UUID, String>> e : poTerminu.entrySet()) {
+            Map<UUID, String> profesoriMap = e.getValue();
+            List<UUID> ids = new ArrayList<>(profesoriMap.keySet());
+            List<String> imena = new ArrayList<>(profesoriMap.values());
+            DetekcijaVezbiResponse.TerminVezbi termin =
+                    new DetekcijaVezbiResponse.TerminVezbi(e.getKey().dan, e.getKey().cas, ids, imena);
+            sviTermini.add(termin);
 
-            List<UUID> ids = new ArrayList<>();
-            List<String> imena = new ArrayList<>();
-            for (RasporedStavka s : grupa) {
-                Korisnik k = s.getKorisnik();
-                ids.add(k.getId());
-                imena.add(k.punoIme());
-                imenaProfesora.put(k.getId(), k.punoIme());
-                brojCasovaPoProfesoru.merge(k.getId(), 1, Integer::sum);
+            if (profesoriMap.size() >= 2) {
+                vezbeTermini.add(termin);
+                for (Map.Entry<UUID, String> p : profesoriMap.entrySet()) {
+                    imenaProfesora.put(p.getKey(), p.getValue());
+                    brojCasovaPoProfesoru.merge(p.getKey(), 1, Integer::sum);
+                }
             }
-            termini.add(new DetekcijaVezbiResponse.TerminVezbi(e.getKey().dan, e.getKey().cas, ids, imena));
         }
 
         List<DetekcijaVezbiResponse.ProfesorVezbi> profesori = brojCasovaPoProfesoru.entrySet().stream()
@@ -94,7 +100,14 @@ public class RotacijaService {
                 .sorted(Comparator.comparing(DetekcijaVezbiResponse.ProfesorVezbi::profesorIme))
                 .toList();
 
-        return new DetekcijaVezbiResponse(odeljenjeId, od.label(), profesori, termini);
+        return new DetekcijaVezbiResponse(
+                odeljenjeId,
+                od.label(),
+                stavke.size(),
+                poTerminu.size(),
+                profesori,
+                vezbeTermini,
+                sviTermini);
     }
 
     // -------- KREIRANJE ROTACIJE --------
@@ -178,7 +191,7 @@ public class RotacijaService {
     @Transactional(readOnly = true)
     public List<RotacijaResponse> moje(CustomUserDetails ja) {
         UUID skolaId = TenantContext.require();
-        return rotacijaRepo.moje(skolaId, ja.id()).stream().map(this::toResponse).toList();
+        return rotacijaRepo.rotacijeNastavnika(skolaId, ja.id()).stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)

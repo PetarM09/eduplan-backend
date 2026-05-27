@@ -26,7 +26,7 @@ public class RotacijaController {
     private final RotacijaService service;
 
     @GetMapping("/vezbe/{odeljenjeId}")
-    @PreAuthorize("hasAnyRole('NASTAVNIK','ADMIN','DIREKTOR','KOORDINATOR')")
+    @PreAuthorize("hasAnyRole('KOORDINATOR','DIREKTOR','ADMIN')")
     @Operation(summary = "Detekcija termina vezbi (2+ profesora istovremeno) za izabrano odeljenje")
     public ApiResponse<DetekcijaVezbiResponse> detektuj(@PathVariable UUID odeljenjeId) {
         return ApiResponse.ok(service.detektujVezbe(odeljenjeId));
@@ -34,7 +34,7 @@ public class RotacijaController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('NASTAVNIK')")
+    @PreAuthorize("hasRole('KOORDINATOR')")
     @Operation(summary = "Kreira rotaciju za odeljenje i automatski generise dodele grupa")
     public ApiResponse<RotacijaResponse> kreiraj(@AuthenticationPrincipal CustomUserDetails ja,
                                                   @Valid @RequestBody KreirajRotacijuRequest req) {
@@ -42,7 +42,7 @@ public class RotacijaController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('NASTAVNIK','ADMIN','DIREKTOR','KOORDINATOR','PP_SLUZBA')")
+    @PreAuthorize("hasAnyRole('KOORDINATOR','DIREKTOR','ADMIN','PP_SLUZBA')")
     @Operation(summary = "Sve rotacije skole")
     public ApiResponse<List<RotacijaResponse>> sve() {
         return ApiResponse.ok(service.sveZaSkolu());
@@ -50,13 +50,13 @@ public class RotacijaController {
 
     @GetMapping("/moje")
     @PreAuthorize("hasRole('NASTAVNIK')")
-    @Operation(summary = "Rotacije koje je kreirao trenutni nastavnik")
+    @Operation(summary = "Rotacije u kojima trenutni nastavnik predaje vezbe")
     public ApiResponse<List<RotacijaResponse>> moje(@AuthenticationPrincipal CustomUserDetails ja) {
         return ApiResponse.ok(service.moje(ja));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('NASTAVNIK','ADMIN','DIREKTOR','KOORDINATOR','PP_SLUZBA')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Detaljan pregled rotacije sa svim nedeljama i dodelama")
     public ApiResponse<RotacijaResponse> pregled(@PathVariable UUID id) {
         return ApiResponse.ok(service.pregled(id));
@@ -64,7 +64,7 @@ public class RotacijaController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
+    @PreAuthorize("hasRole('KOORDINATOR')")
     @Operation(summary = "Brise rotaciju zajedno sa svim dodelama")
     public void obrisi(@PathVariable UUID id) {
         service.obrisi(id);
