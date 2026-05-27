@@ -99,9 +99,9 @@ public class RasporedService {
             Korisnik nastavnik = pronadjiKorisnika(indeksKorisnika, red.nastavnikLabel());
             if (nastavnik == null) {
                 nemapirani.add(red.nastavnikLabel());
-                continue;
+            } else {
+                mapirano++;
             }
-            mapirano++;
 
             for (ParsedRasporedRed.ParsedStavka s : red.stavke()) {
                 // Format "1-1/1-5" znaci da nastavnik u istom casu predaje dva odeljenja
@@ -110,7 +110,7 @@ public class RasporedService {
                 for (String deo : delovi) {
                     Odeljenje od = nadjiIliKreirajOdeljenje(indeksOdeljenja, skolaId, skolskaGodina, deo.trim());
                     if (od == null) continue;
-                    kreiranihStavki += sacuvajStavku(verzija, nastavnik, od, s, skolaId) ? 1 : 0;
+                    kreiranihStavki += sacuvajStavku(verzija, nastavnik, red.nastavnikLabel(), od, s, skolaId) ? 1 : 0;
                 }
             }
         }
@@ -128,11 +128,12 @@ public class RasporedService {
         );
     }
 
-    private boolean sacuvajStavku(VerzijaRasporeda verzija, Korisnik nastavnik, Odeljenje od,
-                                   ParsedRasporedRed.ParsedStavka s, UUID skolaId) {
+    private boolean sacuvajStavku(VerzijaRasporeda verzija, Korisnik nastavnik, String nastavnikLabel,
+                                   Odeljenje od, ParsedRasporedRed.ParsedStavka s, UUID skolaId) {
         RasporedStavka stavka = RasporedStavka.builder()
                 .verzija(verzija)
-                .korisnik(nastavnik)
+                .korisnik(nastavnik) // moze biti null kad korisnik nije u sistemu
+                .nastavnikLabel(nastavnikLabel)
                 .odeljenje(od)
                 .predmetLabel(null)
                 .dan(s.dan())
@@ -161,7 +162,8 @@ public class RasporedService {
                 rs.getDan(),
                 rs.getCas(),
                 k == null ? null : k.getId(),
-                k == null ? null : k.punoIme(),
+                // ime: ako je korisnik mapiran, koristi pun nalog; inace label iz XML-a
+                k != null ? k.punoIme() : rs.getNastavnikLabel(),
                 od == null ? null : od.getId(),
                 od == null ? null : od.label(),
                 rs.getPredmetLabel()

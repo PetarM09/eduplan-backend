@@ -62,41 +62,47 @@ public class RotacijaService {
 
         List<RasporedStavka> stavke = stavkaRepo.sveZaOdeljenje(skolaId, verzija.getId(), odeljenjeId);
 
-        // Grupisi po terminu (dan, cas). Distinct profesori po terminu — neki XML
-        // formati ubace istog profesora vise puta za isti termin (npr. "4-1/4-1").
-        Map<TerminKljuc, Map<UUID, String>> poTerminu = new LinkedHashMap<>();
+        // Grupisi po terminu (dan, cas). Profesor se identifikuje po imenu (label)
+        // iz rasporeda — distinct po terminu, jer neki XML formati ubacuju istog
+        // profesora vise puta za isti termin (npr. "4-1/4-1").
+        Map<TerminKljuc, Map<String, UUID>> poTerminu = new LinkedHashMap<>();
         for (RasporedStavka s : stavke) {
-            Korisnik k = s.getKorisnik();
+            String label = s.getNastavnikLabel();
+            UUID korisnikId = s.getKorisnik() == null ? null : s.getKorisnik().getId();
             poTerminu
                     .computeIfAbsent(new TerminKljuc(s.getDan(), s.getCas()), key -> new LinkedHashMap<>())
-                    .putIfAbsent(k.getId(), k.punoIme());
+                    .merge(label, korisnikId, (postojeci, novi) -> postojeci != null ? postojeci : novi);
         }
 
         List<DetekcijaVezbiResponse.TerminVezbi> sviTermini = new ArrayList<>();
         List<DetekcijaVezbiResponse.TerminVezbi> vezbeTermini = new ArrayList<>();
-        Map<UUID, Integer> brojCasovaPoProfesoru = new LinkedHashMap<>();
-        Map<UUID, String> imenaProfesora = new HashMap<>();
+        Map<String, Integer> brojCasovaPoLabelu = new LinkedHashMap<>();
+        Map<String, UUID> idPoLabelu = new HashMap<>();
 
-        for (Map.Entry<TerminKljuc, Map<UUID, String>> e : poTerminu.entrySet()) {
-            Map<UUID, String> profesoriMap = e.getValue();
-            List<UUID> ids = new ArrayList<>(profesoriMap.keySet());
-            List<String> imena = new ArrayList<>(profesoriMap.values());
+        for (Map.Entry<TerminKljuc, Map<String, UUID>> e : poTerminu.entrySet()) {
+            Map<String, UUID> profesoriMap = e.getValue();
+            List<String> imena = new ArrayList<>(profesoriMap.keySet());
+            List<UUID> ids = imena.stream().map(profesoriMap::get).toList();
             DetekcijaVezbiResponse.TerminVezbi termin =
                     new DetekcijaVezbiResponse.TerminVezbi(e.getKey().dan, e.getKey().cas, ids, imena);
             sviTermini.add(termin);
 
             if (profesoriMap.size() >= 2) {
                 vezbeTermini.add(termin);
-                for (Map.Entry<UUID, String> p : profesoriMap.entrySet()) {
-                    imenaProfesora.put(p.getKey(), p.getValue());
-                    brojCasovaPoProfesoru.merge(p.getKey(), 1, Integer::sum);
+                for (Map.Entry<String, UUID> p : profesoriMap.entrySet()) {
+                    idPoLabelu.merge(p.getKey(), p.getValue(),
+                            (postojeci, novi) -> postojeci != null ? postojeci : novi);
+                    brojCasovaPoLabelu.merge(p.getKey(), 1, Integer::sum);
                 }
             }
         }
 
-        List<DetekcijaVezbiResponse.ProfesorVezbi> profesori = brojCasovaPoProfesoru.entrySet().stream()
+        List<DetekcijaVezbiResponse.ProfesorVezbi> profesori = brojCasovaPoLabelu.entrySet().stream()
                 .map(e -> new DetekcijaVezbiResponse.ProfesorVezbi(
-                        e.getKey(), imenaProfesora.get(e.getKey()), e.getValue()))
+                        idPoLabelu.get(e.getKey()),
+                        e.getKey(),
+                        idPoLabelu.get(e.getKey()) != null,
+                        e.getValue()))
                 .sorted(Comparator.comparing(DetekcijaVezbiResponse.ProfesorVezbi::profesorIme))
                 .toList();
 
@@ -118,9 +124,26 @@ public class RotacijaService {
 
         DetekcijaVezbiResponse detekcija = detektujVezbe(req.odeljenjeId());
 
+        // Provera: svi profesori sa vezbama u rasporedu moraju biti u sistemu
+        List<String> neuSistemu = detekcija.profesori().stream()
+                .filter(p -> !p.uSistemu())
+                .map(DetekcijaVezbiResponse.ProfesorVezbi::profesorIme)
+                .toList();
+        if (!neuSistemu.isEmpty()) {
+            throw new ValidationException(
+                    "PROFESORI_VAN_SISTEMA",
+                    "Sledeci profesori vezbi nisu u sistemu kao korisnici: %s. "
+                            .formatted(String.join(", ", neuSistemu))
+                            + "Dodaj ih u Korisnici pre kreiranja rotacije.");
+        }
+
         // Validacija: suma casova po profesoru iz request-a mora biti = detektovani broj
         Map<UUID, Integer> detektovaniPoProfesoru = new HashMap<>();
-        detekcija.profesori().forEach(p -> detektovaniPoProfesoru.put(p.profesorId(), p.brojCasovaVezbi()));
+        Map<UUID, String> imePoIdu = new HashMap<>();
+        detekcija.profesori().forEach(p -> {
+            detektovaniPoProfesoru.put(p.profesorId(), p.brojCasovaVezbi());
+            imePoIdu.put(p.profesorId(), p.profesorIme());
+        });
 
         Map<UUID, Integer> unetiPoProfesoru = new HashMap<>();
         for (KreirajRotacijuRequest.PredmetStavka st : req.predmeti()) {

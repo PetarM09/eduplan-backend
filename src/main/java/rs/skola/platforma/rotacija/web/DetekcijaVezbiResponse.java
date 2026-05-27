@@ -7,10 +7,15 @@ import java.util.UUID;
 
 /**
  * Rezultat detekcije vezbi za izabrano odeljenje iz aktivne verzije rasporeda.
- * Vraca po profesoru broj termina vezbi (vise profesora u istom terminu)
- * i pratecu dijagnostiku: ukupan broj stavki za odeljenje i raspored svih
- * termina (i onih sa jednim profesorom) da bi korisnik video sirovo stanje
- * rasporeda i odmah uocio gde je problem ako vezbi nema.
+ *
+ * <p>Profesori se identifikuju po imenu iz XML-a (label), bez obzira na to da li
+ * postoji odgovarajuci korisnicki nalog u sistemu. {@code profesorId} je null
+ * ako jos nije mapiran. To omogucava da koordinator vidi sve potencijalne
+ * profesore vezbi i odluci koji nedostaju u sistemu pre nego sto pravi rotaciju.
+ *
+ * <p>{@code sviTermini} sadrzi sve termine za odeljenje (sa 1+ profesora) radi
+ * dijagnostike kad rotacija ne vidi vezbe; {@code termini} samo one sa 2+
+ * profesora (kandidati za rotaciju).
  */
 public record DetekcijaVezbiResponse(
         UUID odeljenjeId,
@@ -23,15 +28,16 @@ public record DetekcijaVezbiResponse(
 ) {
 
     public record ProfesorVezbi(
-            UUID profesorId,
-            String profesorIme,
+            UUID profesorId,        // null ako profesor jos nije u sistemu
+            String profesorIme,     // ime iz rasporeda (XML-a)
+            boolean uSistemu,
             int brojCasovaVezbi
     ) {}
 
     public record TerminVezbi(
             Dan dan,
             Short cas,
-            List<UUID> profesoriIds,
+            List<UUID> profesoriIds,    // null za one koji nisu mapirani u sistem
             List<String> profesoriImena
     ) {}
 }

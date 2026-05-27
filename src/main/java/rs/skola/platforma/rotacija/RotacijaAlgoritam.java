@@ -38,9 +38,11 @@ public class RotacijaAlgoritam {
         int n = r.getBrojNedelja();
 
         // 1. Termini po profesoru (vec sortirani iz detekcije po dan/cas).
+        // Servis je vec validirao da su svi profesori u sistemu (id != null).
         Map<UUID, List<DetekcijaVezbiResponse.TerminVezbi>> terminePoProfesoru = new HashMap<>();
         for (DetekcijaVezbiResponse.TerminVezbi t : detekcija.termini()) {
             for (UUID profId : t.profesoriIds()) {
+                if (profId == null) continue;
                 terminePoProfesoru.computeIfAbsent(profId, k -> new ArrayList<>()).add(t);
             }
         }
@@ -80,6 +82,7 @@ public class RotacijaAlgoritam {
             for (DetekcijaVezbiResponse.TerminVezbi t : detekcija.termini()) {
                 List<RotPredmet> aktivniKanali = new ArrayList<>();
                 for (UUID profId : t.profesoriIds()) {
+                    if (profId == null) continue;
                     RotPredmet pred = terminProfPredmet.get(new KljucTerminProfesor(t.dan(), t.cas(), profId));
                     if (pred != null) aktivniKanali.add(pred);
                 }
