@@ -10,71 +10,62 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import rs.skola.platforma.auth.security.CustomUserDetails;
 import rs.skola.platforma.common.web.ApiResponse;
-import rs.skola.platforma.rotacija.web.AzurirajNedeljuRequest;
+import rs.skola.platforma.rotacija.web.DetekcijaVezbiResponse;
 import rs.skola.platforma.rotacija.web.KreirajRotacijuRequest;
-import rs.skola.platforma.rotacija.web.RotNedeljaResponse;
 import rs.skola.platforma.rotacija.web.RotacijaResponse;
 
 import java.util.List;
 import java.util.UUID;
 
-@Tag(name = "Rotacija", description = "Rotacioni raspored za grupne casove (vezbe)")
+@Tag(name = "Rotacija", description = "Rotacioni raspored grupa za vezbe jednog odeljenja")
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/rotacija")
 @RequiredArgsConstructor
 public class RotacijaController {
 
     private final RotacijaService service;
 
-    @PostMapping("/rotacija")
+    @GetMapping("/vezbe/{odeljenjeId}")
+    @PreAuthorize("hasAnyRole('NASTAVNIK','ADMIN','DIREKTOR','KOORDINATOR')")
+    @Operation(summary = "Detekcija termina vezbi (2+ profesora istovremeno) za izabrano odeljenje")
+    public ApiResponse<DetekcijaVezbiResponse> detektuj(@PathVariable UUID odeljenjeId) {
+        return ApiResponse.ok(service.detektujVezbe(odeljenjeId));
+    }
+
+    @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('NASTAVNIK')")
-    @Operation(summary = "Kreira novu rotacionu konfiguraciju za predmet/odeljenja")
+    @Operation(summary = "Kreira rotaciju za odeljenje i automatski generise dodele grupa")
     public ApiResponse<RotacijaResponse> kreiraj(@AuthenticationPrincipal CustomUserDetails ja,
                                                   @Valid @RequestBody KreirajRotacijuRequest req) {
-        return ApiResponse.ok(service.kreirajKonfiguraciju(ja, req));
+        return ApiResponse.ok(service.kreiraj(ja, req));
     }
 
-    @PostMapping("/rotacija/{id}/generisi")
-    @PreAuthorize("hasRole('NASTAVNIK')")
-    @Operation(summary = "Generise pun ciklus C(N,K) — brise prethodne nedelje ako postoje")
-    public ApiResponse<RotacijaResponse> generisi(@PathVariable UUID id) {
-        return ApiResponse.ok(service.generisi(id));
-    }
-
-    @GetMapping("/rotacija")
+    @GetMapping
     @PreAuthorize("hasAnyRole('NASTAVNIK','ADMIN','DIREKTOR','KOORDINATOR','PP_SLUZBA')")
-    @Operation(summary = "Sve rotacione konfiguracije skole")
+    @Operation(summary = "Sve rotacije skole")
     public ApiResponse<List<RotacijaResponse>> sve() {
         return ApiResponse.ok(service.sveZaSkolu());
     }
 
-    @GetMapping("/rotacija/moje")
+    @GetMapping("/moje")
     @PreAuthorize("hasRole('NASTAVNIK')")
-    @Operation(summary = "Moje rotacione konfiguracije")
+    @Operation(summary = "Rotacije koje je kreirao trenutni nastavnik")
     public ApiResponse<List<RotacijaResponse>> moje(@AuthenticationPrincipal CustomUserDetails ja) {
-        return ApiResponse.ok(service.mojeKonfiguracije(ja));
+        return ApiResponse.ok(service.moje(ja));
     }
 
-    @GetMapping("/rotacija/{id}")
+    @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('NASTAVNIK','ADMIN','DIREKTOR','KOORDINATOR','PP_SLUZBA')")
-    @Operation(summary = "Detaljan pregled rotacije sa svim nedeljama i statistikom balansa")
+    @Operation(summary = "Detaljan pregled rotacije sa svim nedeljama i dodelama")
     public ApiResponse<RotacijaResponse> pregled(@PathVariable UUID id) {
         return ApiResponse.ok(service.pregled(id));
     }
 
-    @PutMapping("/rotacija/nedelje/{id}")
-    @PreAuthorize("hasAnyRole('NASTAVNIK','ADMIN','DIREKTOR','KOORDINATOR')")
-    @Operation(summary = "Rucno premestanje odeljenja u datoj nedelji")
-    public ApiResponse<RotNedeljaResponse> azurirajNedelju(@PathVariable UUID id,
-                                                            @Valid @RequestBody AzurirajNedeljuRequest req) {
-        return ApiResponse.ok(service.azurirajNedelju(id, req));
-    }
-
-    @DeleteMapping("/rotacija/{id}")
-    @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
+    @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Brise rotacionu konfiguraciju (i sve nedelje)")
+    @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
+    @Operation(summary = "Brise rotaciju zajedno sa svim dodelama")
     public void obrisi(@PathVariable UUID id) {
         service.obrisi(id);
     }

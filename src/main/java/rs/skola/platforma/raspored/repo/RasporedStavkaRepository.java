@@ -64,4 +64,17 @@ public interface RasporedStavkaRepository extends JpaRepository<RasporedStavka, 
                                                 @Param("verzijaId") UUID verzijaId,
                                                 @Param("korisnikId") UUID korisnikId,
                                                 @Param("dan") rs.skola.platforma.raspored.domain.Dan dan);
+
+    /** Sve stavke jednog odeljenja iz aktivne verzije rasporeda — za detekciju termina vezbi. */
+    @Query("""
+            SELECT rs FROM RasporedStavka rs
+            LEFT JOIN FETCH rs.korisnik
+            WHERE rs.skolaId = :skolaId
+              AND rs.verzija.id = :verzijaId
+              AND rs.odeljenje.id = :odeljenjeId
+            ORDER BY rs.dan ASC, rs.cas ASC
+            """)
+    List<RasporedStavka> sveZaOdeljenje(@Param("skolaId") UUID skolaId,
+                                         @Param("verzijaId") UUID verzijaId,
+                                         @Param("odeljenjeId") UUID odeljenjeId);
 }

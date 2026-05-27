@@ -1,7 +1,9 @@
 package rs.skola.platforma.rotacija.web;
 
+import rs.skola.platforma.raspored.domain.Dan;
+
+import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 public record RotacijaResponse(
@@ -9,21 +11,36 @@ public record RotacijaResponse(
         String naziv,
         UUID nastavnikId,
         String nastavnikIme,
-        UUID predmetId,
-        String predmetNaziv,
-        Short grupaVelicina,
-        Short casovaNedeljno,
+        UUID odeljenjeId,
+        String odeljenjeLabel,
+        Short brojGrupa,
+        Short brojNedelja,
         String skolskaGodina,
-        List<OdeljenjeKratko> odeljenja,
-        List<RotNedeljaResponse> nedelje,
-        Statistika statistika
+        List<PredmetResponse> predmeti,
+        List<NedeljaResponse> nedelje,
+        OffsetDateTime createdAt
 ) {
 
-    public record Statistika(
-            boolean balansirano,
-            int minCasovaPoOdeljenju,
-            int maxCasovaPoOdeljenju,
-            Map<UUID, Integer> casoviPoOdeljenju,
-            int ukupnoNedelja
+    public record PredmetResponse(
+            UUID id,
+            UUID profesorId,
+            String profesorIme,
+            String naziv,
+            Short casovaNedeljno,
+            Short redniBroj
+    ) {}
+
+    public record NedeljaResponse(
+            Short brojNedelje,
+            List<TerminDodela> termini
+    ) {}
+
+    public record TerminDodela(
+            Dan dan,
+            Short cas,
+            UUID profesorId,
+            String profesorIme,
+            String predmetNaziv,
+            Short brojGrupe
     ) {}
 }

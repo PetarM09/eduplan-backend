@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import rs.skola.platforma.auth.security.CustomUserDetails;
-import rs.skola.platforma.common.exception.ConflictException;
 import rs.skola.platforma.common.exception.ResourceNotFoundException;
 import rs.skola.platforma.common.exception.TenantViolationException;
 import rs.skola.platforma.common.exception.ValidationException;
@@ -13,220 +12,250 @@ import rs.skola.platforma.korisnici.domain.Korisnik;
 import rs.skola.platforma.korisnici.repo.KorisnikRepository;
 import rs.skola.platforma.odeljenja.domain.Odeljenje;
 import rs.skola.platforma.odeljenja.repo.OdeljenjeRepository;
-import rs.skola.platforma.predmeti.domain.Predmet;
-import rs.skola.platforma.rotacija.domain.RotKonfiguracija;
-import rs.skola.platforma.rotacija.domain.RotNedelja;
-import rs.skola.platforma.rotacija.repo.RotKonfiguracijaRepository;
-import rs.skola.platforma.rotacija.repo.RotNedeljaRepository;
-import rs.skola.platforma.rotacija.web.AzurirajNedeljuRequest;
+import rs.skola.platforma.raspored.domain.Dan;
+import rs.skola.platforma.raspored.domain.RasporedStavka;
+import rs.skola.platforma.raspored.domain.VerzijaRasporeda;
+import rs.skola.platforma.raspored.repo.RasporedStavkaRepository;
+import rs.skola.platforma.raspored.repo.VerzijaRasporedaRepository;
+import rs.skola.platforma.rotacija.domain.RotDodela;
+import rs.skola.platforma.rotacija.domain.RotPredmet;
+import rs.skola.platforma.rotacija.domain.Rotacija;
+import rs.skola.platforma.rotacija.repo.RotacijaRepository;
+import rs.skola.platforma.rotacija.web.DetekcijaVezbiResponse;
 import rs.skola.platforma.rotacija.web.KreirajRotacijuRequest;
-import rs.skola.platforma.rotacija.web.OdeljenjeKratko;
-import rs.skola.platforma.rotacija.web.RotNedeljaResponse;
 import rs.skola.platforma.rotacija.web.RotacijaResponse;
-import rs.skola.platforma.predmeti.repo.PredmetRepository;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class RotacijaService {
 
-    private final RotKonfiguracijaRepository konfigRepo;
-    private final RotNedeljaRepository nedeljaRepo;
+    private final RotacijaRepository rotacijaRepo;
     private final OdeljenjeRepository odeljenjeRepo;
-    private final PredmetRepository predmetRepo;
     private final KorisnikRepository korisnikRepo;
-    private final RotacijaAlgorithm algoritam;
+    private final VerzijaRasporedaRepository verzijaRepo;
+    private final RasporedStavkaRepository stavkaRepo;
+    private final RotacijaAlgoritam algoritam;
 
-    @Transactional
-    public RotacijaResponse kreirajKonfiguraciju(CustomUserDetails ja, KreirajRotacijuRequest req) {
+    // -------- DETEKCIJA VEZBI --------
+
+    @Transactional(readOnly = true)
+    public DetekcijaVezbiResponse detektujVezbe(UUID odeljenjeId) {
         UUID skolaId = TenantContext.require();
-
-        if (req.grupaVelicina() > req.odeljenjaIds().size()) {
-            throw new ValidationException("Velicina grupe ne moze biti veca od broja odeljenja");
+        Odeljenje od = odeljenjeRepo.findById(odeljenjeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Odeljenje", odeljenjeId));
+        if (!skolaId.equals(od.getSkolaId())) {
+            throw new TenantViolationException();
         }
 
-        List<Odeljenje> odeljenja = ucitajOdeljenjaIzSkole(skolaId, req.odeljenjaIds());
+        VerzijaRasporeda verzija = verzijaRepo.findFirstBySkolaIdAndAktivanTrue(skolaId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "VEZBE_NEMA_RASPOREDA",
+                        "Aktivna verzija rasporeda ne postoji — uvezi raspored pre kreiranja rotacije"));
 
-        Korisnik nastavnik = korisnikRepo.findById(ja.id())
-                .orElseThrow(() -> new ResourceNotFoundException("Korisnik", ja.id()));
+        List<RasporedStavka> stavke = stavkaRepo.sveZaOdeljenje(skolaId, verzija.getId(), odeljenjeId);
 
-        Predmet predmet = null;
-        if (req.predmetId() != null) {
-            predmet = predmetRepo.findById(req.predmetId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Predmet", req.predmetId()));
-            if (!skolaId.equals(predmet.getSkolaId())) {
-                throw new TenantViolationException("Predmet ne pripada vasoj skoli");
+        // Grupisi po terminu (dan, cas) i ostavi samo termine sa 2+ profesora.
+        Map<TerminKljuc, List<RasporedStavka>> poTerminu = new LinkedHashMap<>();
+        for (RasporedStavka s : stavke) {
+            poTerminu.computeIfAbsent(new TerminKljuc(s.getDan(), s.getCas()), k -> new ArrayList<>()).add(s);
+        }
+
+        List<DetekcijaVezbiResponse.TerminVezbi> termini = new ArrayList<>();
+        Map<UUID, Integer> brojCasovaPoProfesoru = new LinkedHashMap<>();
+        Map<UUID, String> imenaProfesora = new HashMap<>();
+
+        for (Map.Entry<TerminKljuc, List<RasporedStavka>> e : poTerminu.entrySet()) {
+            List<RasporedStavka> grupa = e.getValue();
+            if (grupa.size() < 2) continue;
+
+            List<UUID> ids = new ArrayList<>();
+            List<String> imena = new ArrayList<>();
+            for (RasporedStavka s : grupa) {
+                Korisnik k = s.getKorisnik();
+                ids.add(k.getId());
+                imena.add(k.punoIme());
+                imenaProfesora.put(k.getId(), k.punoIme());
+                brojCasovaPoProfesoru.merge(k.getId(), 1, Integer::sum);
+            }
+            termini.add(new DetekcijaVezbiResponse.TerminVezbi(e.getKey().dan, e.getKey().cas, ids, imena));
+        }
+
+        List<DetekcijaVezbiResponse.ProfesorVezbi> profesori = brojCasovaPoProfesoru.entrySet().stream()
+                .map(e -> new DetekcijaVezbiResponse.ProfesorVezbi(
+                        e.getKey(), imenaProfesora.get(e.getKey()), e.getValue()))
+                .sorted(Comparator.comparing(DetekcijaVezbiResponse.ProfesorVezbi::profesorIme))
+                .toList();
+
+        return new DetekcijaVezbiResponse(odeljenjeId, od.label(), profesori, termini);
+    }
+
+    // -------- KREIRANJE ROTACIJE --------
+
+    @Transactional
+    public RotacijaResponse kreiraj(CustomUserDetails ja, KreirajRotacijuRequest req) {
+        UUID skolaId = TenantContext.require();
+
+        DetekcijaVezbiResponse detekcija = detektujVezbe(req.odeljenjeId());
+
+        // Validacija: suma casova po profesoru iz request-a mora biti = detektovani broj
+        Map<UUID, Integer> detektovaniPoProfesoru = new HashMap<>();
+        detekcija.profesori().forEach(p -> detektovaniPoProfesoru.put(p.profesorId(), p.brojCasovaVezbi()));
+
+        Map<UUID, Integer> unetiPoProfesoru = new HashMap<>();
+        for (KreirajRotacijuRequest.PredmetStavka st : req.predmeti()) {
+            unetiPoProfesoru.merge(st.profesorId(), st.casovaNedeljno().intValue(), Integer::sum);
+        }
+
+        for (DetekcijaVezbiResponse.ProfesorVezbi p : detekcija.profesori()) {
+            int uneto = unetiPoProfesoru.getOrDefault(p.profesorId(), 0);
+            if (uneto != p.brojCasovaVezbi()) {
+                throw new ValidationException(
+                        "SUMA_CASOVA",
+                        "Profesor %s ima %d casova vezbi u rasporedu, a unet je zbir %d"
+                                .formatted(p.profesorIme(), p.brojCasovaVezbi(), uneto));
             }
         }
 
-        RotKonfiguracija k = RotKonfiguracija.builder()
-                .nastavnik(nastavnik)
-                .predmet(predmet)
+        for (UUID profesorId : unetiPoProfesoru.keySet()) {
+            if (!detektovaniPoProfesoru.containsKey(profesorId)) {
+                throw new ValidationException(
+                        "Profesor sa id %s nema casove vezbi u odeljenju".formatted(profesorId));
+            }
+        }
+
+        Odeljenje od = odeljenjeRepo.findById(req.odeljenjeId()).orElseThrow();
+        Korisnik kreator = korisnikRepo.findById(ja.id())
+                .orElseThrow(() -> new ResourceNotFoundException("Korisnik", ja.id()));
+
+        Rotacija r = Rotacija.builder()
+                .nastavnik(kreator)
+                .odeljenje(od)
                 .naziv(req.naziv())
-                .odeljenjaIds(odeljenja.stream().map(Odeljenje::getId).toList())
-                .grupaVelicina(req.grupaVelicina())
-                .casovaNedeljno(req.casovaNedeljno())
+                .brojGrupa(req.brojGrupa())
+                .brojNedelja(req.brojNedelja())
                 .skolskaGodina(req.skolskaGodina())
                 .build();
-        k.setSkolaId(skolaId);
-        return toResponse(konfigRepo.save(k), odeljenja, List.of());
-    }
+        r.setSkolaId(skolaId);
 
-    @Transactional
-    public RotacijaResponse generisi(UUID konfiguracijaId) {
-        UUID skolaId = TenantContext.require();
-        RotKonfiguracija k = nadjiUSkoli(konfiguracijaId, skolaId);
-
-        nedeljaRepo.deleteAllByKonfiguracijaId(k.getId());
-
-        List<List<UUID>> kombinacije = algoritam.generisiCiklus(
-                k.getOdeljenjaIds(), k.getGrupaVelicina());
-
-        List<RotNedelja> nedelje = new ArrayList<>();
-        short broj = 1;
-        for (List<UUID> kombinacija : kombinacije) {
-            RotNedelja n = RotNedelja.builder()
-                    .konfiguracija(k)
-                    .brojNedelje(broj++)
-                    .odeljenjaIds(kombinacija)
+        short rb = 1;
+        for (KreirajRotacijuRequest.PredmetStavka st : req.predmeti()) {
+            Korisnik profesor = korisnikRepo.findById(st.profesorId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Profesor", st.profesorId()));
+            RotPredmet p = RotPredmet.builder()
+                    .rotacija(r)
+                    .profesor(profesor)
+                    .naziv(st.naziv())
+                    .casovaNedeljno(st.casovaNedeljno())
+                    .redniBroj(rb++)
                     .build();
-            n.setSkolaId(skolaId);
-            nedelje.add(nedeljaRepo.save(n));
+            r.getPredmeti().add(p);
         }
-        List<Odeljenje> odeljenja = ucitajOdeljenjaIzSkole(skolaId, k.getOdeljenjaIds());
-        return toResponse(k, odeljenja, nedelje);
+
+        // Generisi dodele
+        List<RotDodela> dodele = algoritam.generisi(r, detekcija);
+        r.getDodele().addAll(dodele);
+
+        Rotacija sacuvana = rotacijaRepo.save(r);
+        return toResponse(sacuvana);
     }
+
+    // -------- CITANJE --------
 
     @Transactional(readOnly = true)
     public List<RotacijaResponse> sveZaSkolu() {
         UUID skolaId = TenantContext.require();
-        return konfigRepo.sveZaSkolu(skolaId).stream()
-                .map(k -> toResponse(k, ucitajOdeljenjaIzSkole(skolaId, k.getOdeljenjaIds()),
-                        nedeljaRepo.findAllByKonfiguracijaIdOrderByBrojNedeljeAsc(k.getId())))
-                .toList();
+        return rotacijaRepo.sveZaSkolu(skolaId).stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
-    public List<RotacijaResponse> mojeKonfiguracije(CustomUserDetails ja) {
+    public List<RotacijaResponse> moje(CustomUserDetails ja) {
         UUID skolaId = TenantContext.require();
-        return konfigRepo.mojeKonfiguracije(skolaId, ja.id()).stream()
-                .map(k -> toResponse(k, ucitajOdeljenjaIzSkole(skolaId, k.getOdeljenjaIds()),
-                        nedeljaRepo.findAllByKonfiguracijaIdOrderByBrojNedeljeAsc(k.getId())))
-                .toList();
+        return rotacijaRepo.moje(skolaId, ja.id()).stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
-    public RotacijaResponse pregled(UUID konfiguracijaId) {
-        UUID skolaId = TenantContext.require();
-        RotKonfiguracija k = nadjiUSkoli(konfiguracijaId, skolaId);
-        return toResponse(k,
-                ucitajOdeljenjaIzSkole(skolaId, k.getOdeljenjaIds()),
-                nedeljaRepo.findAllByKonfiguracijaIdOrderByBrojNedeljeAsc(k.getId()));
+    public RotacijaResponse pregled(UUID id) {
+        return toResponse(nadji(id));
     }
 
     @Transactional
-    public RotNedeljaResponse azurirajNedelju(UUID nedeljaId, AzurirajNedeljuRequest req) {
-        UUID skolaId = TenantContext.require();
-        RotNedelja n = nedeljaRepo.findById(nedeljaId)
-                .orElseThrow(() -> new ResourceNotFoundException("Rotaciona nedelja", nedeljaId));
-        if (!skolaId.equals(n.getSkolaId())) {
-            throw new TenantViolationException();
-        }
-        RotKonfiguracija k = n.getKonfiguracija();
-        Set<UUID> dozvoljena = new HashSet<>(k.getOdeljenjaIds());
-        if (!dozvoljena.containsAll(req.odeljenjaIds())) {
-            throw new ConflictException("Nedelja sme da sadrzi samo odeljenja iz konfiguracije");
-        }
-        if (req.odeljenjaIds().size() != k.getGrupaVelicina()) {
-            throw new ValidationException("Nedelja mora imati tacno %d odeljenja".formatted(k.getGrupaVelicina()));
-        }
-        n.setOdeljenjaIds(req.odeljenjaIds());
-
-        List<Odeljenje> odeljenja = ucitajOdeljenjaIzSkole(skolaId, n.getOdeljenjaIds());
-        Map<UUID, Odeljenje> mapa = new HashMap<>();
-        odeljenja.forEach(o -> mapa.put(o.getId(), o));
-        return new RotNedeljaResponse(n.getId(), n.getBrojNedelje(),
-                n.getOdeljenjaIds().stream().map(mapa::get).filter(java.util.Objects::nonNull)
-                        .map(this::toKratko).toList());
+    public void obrisi(UUID id) {
+        rotacijaRepo.delete(nadji(id));
     }
 
-    @Transactional
-    public void obrisi(UUID konfiguracijaId) {
+    private Rotacija nadji(UUID id) {
         UUID skolaId = TenantContext.require();
-        RotKonfiguracija k = nadjiUSkoli(konfiguracijaId, skolaId);
-        konfigRepo.delete(k);
-    }
-
-    // -------- helpers --------
-
-    private RotKonfiguracija nadjiUSkoli(UUID id, UUID skolaId) {
-        RotKonfiguracija k = konfigRepo.findById(id)
+        Rotacija r = rotacijaRepo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Rotacija", id));
-        if (!skolaId.equals(k.getSkolaId())) {
+        if (!skolaId.equals(r.getSkolaId())) {
             throw new TenantViolationException();
         }
-        return k;
+        return r;
     }
 
-    private List<Odeljenje> ucitajOdeljenjaIzSkole(UUID skolaId, List<UUID> ids) {
-        List<Odeljenje> odeljenja = odeljenjeRepo.findAllById(ids);
-        for (Odeljenje o : odeljenja) {
-            if (!skolaId.equals(o.getSkolaId())) {
-                throw new TenantViolationException("Odeljenje " + o.getId() + " ne pripada vasoj skoli");
-            }
-        }
-        if (odeljenja.size() != ids.size()) {
-            throw new ResourceNotFoundException("Neka od navedenih odeljenja ne postoje");
-        }
-        odeljenja.sort(Comparator.comparing(Odeljenje::getRazred).thenComparing(Odeljenje::getOznaka));
-        return odeljenja;
-    }
+    // -------- MAPIRANJE --------
 
-    private OdeljenjeKratko toKratko(Odeljenje o) {
-        return new OdeljenjeKratko(o.getId(), o.label(), o.getRazred(), o.getOznaka());
-    }
-
-    private RotacijaResponse toResponse(RotKonfiguracija k, List<Odeljenje> odeljenja, List<RotNedelja> nedelje) {
-        Map<UUID, Odeljenje> mapa = new HashMap<>();
-        odeljenja.forEach(o -> mapa.put(o.getId(), o));
-
-        List<RotNedeljaResponse> nedeljeResp = nedelje.stream()
-                .map(n -> new RotNedeljaResponse(
-                        n.getId(),
-                        n.getBrojNedelje(),
-                        n.getOdeljenjaIds().stream()
-                                .map(mapa::get).filter(java.util.Objects::nonNull)
-                                .map(this::toKratko).toList()))
+    private RotacijaResponse toResponse(Rotacija r) {
+        List<RotacijaResponse.PredmetResponse> predmeti = r.getPredmeti().stream()
+                .sorted(Comparator.comparing(RotPredmet::getRedniBroj))
+                .map(p -> new RotacijaResponse.PredmetResponse(
+                        p.getId(),
+                        p.getProfesor().getId(),
+                        p.getProfesor().punoIme(),
+                        p.getNaziv(),
+                        p.getCasovaNedeljno(),
+                        p.getRedniBroj()))
                 .toList();
 
-        List<List<UUID>> kombinacije = nedelje.stream().map(RotNedelja::getOdeljenjaIds).toList();
-        RotacijaAlgorithm.IzvestajBalansa izv = algoritam.validirajBalans(k.getOdeljenjaIds(), kombinacije);
-        RotacijaResponse.Statistika stat = new RotacijaResponse.Statistika(
-                izv.balansirano(), izv.minCasova(), izv.maxCasova(), izv.casoviPoOdeljenju(), nedelje.size());
+        // Grupisi dodele po nedelji, zatim po (dan, cas)
+        Map<Short, List<RotDodela>> poNedelji = new LinkedHashMap<>();
+        for (RotDodela d : r.getDodele()) {
+            poNedelji.computeIfAbsent(d.getBrojNedelje(), k -> new ArrayList<>()).add(d);
+        }
 
-        Korisnik n = k.getNastavnik();
-        Predmet p = k.getPredmet();
+        List<RotacijaResponse.NedeljaResponse> nedelje = new ArrayList<>();
+        for (short i = 1; i <= r.getBrojNedelja(); i++) {
+            List<RotDodela> lista = poNedelji.getOrDefault(i, List.of());
+            lista = new ArrayList<>(lista);
+            lista.sort(Comparator
+                    .comparing((RotDodela d) -> d.getDan().ordinal())
+                    .thenComparing(RotDodela::getCas));
+            List<RotacijaResponse.TerminDodela> termini = lista.stream()
+                    .map(d -> new RotacijaResponse.TerminDodela(
+                            d.getDan(),
+                            d.getCas(),
+                            d.getProfesor().getId(),
+                            d.getProfesor().punoIme(),
+                            d.getPredmetNaziv(),
+                            d.getBrojGrupe()))
+                    .toList();
+            nedelje.add(new RotacijaResponse.NedeljaResponse(i, termini));
+        }
+
         return new RotacijaResponse(
-                k.getId(),
-                k.getNaziv(),
-                n == null ? null : n.getId(),
-                n == null ? null : n.punoIme(),
-                p == null ? null : p.getId(),
-                p == null ? null : p.getNaziv(),
-                k.getGrupaVelicina(),
-                k.getCasovaNedeljno(),
-                k.getSkolskaGodina(),
-                odeljenja.stream().map(this::toKratko).toList(),
-                nedeljeResp,
-                stat
+                r.getId(),
+                r.getNaziv(),
+                r.getNastavnik().getId(),
+                r.getNastavnik().punoIme(),
+                r.getOdeljenje().getId(),
+                r.getOdeljenje().label(),
+                r.getBrojGrupa(),
+                r.getBrojNedelja(),
+                r.getSkolskaGodina(),
+                predmeti,
+                nedelje,
+                r.getCreatedAt()
         );
     }
+
+    /** Kompozitni kljuc za grupisanje stavki rasporeda po terminu. */
+    private record TerminKljuc(Dan dan, Short cas) {}
 }
