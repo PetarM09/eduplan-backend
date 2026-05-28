@@ -132,34 +132,39 @@ public class RotacijaService {
 
         DetekcijaVezbiResponse detekcija = detektujVezbe(req.odeljenjeId());
 
-        // Provera: svi profesori sa vezbama u rasporedu moraju biti u sistemu
-        List<String> neuSistemu = detekcija.profesori().stream()
-                .filter(p -> !p.uSistemu())
-                .map(DetekcijaVezbiResponse.ProfesorVezbi::profesorIme)
-                .toList();
-        if (!neuSistemu.isEmpty()) {
-            throw new ValidationException(
-                    "PROFESORI_VAN_SISTEMA",
-                    "Sledeci profesori vezbi nisu u sistemu kao korisnici: %s. "
-                            .formatted(String.join(", ", neuSistemu))
-                            + "Dodaj ih u Korisnici pre kreiranja rotacije.");
-        }
-
-        // Validacija: suma casova po profesoru iz request-a mora biti = detektovani broj
-        Map<UUID, Integer> detektovaniPoProfesoru = new HashMap<>();
-        Map<UUID, String> imePoIdu = new HashMap<>();
-        detekcija.profesori().forEach(p -> {
-            detektovaniPoProfesoru.put(p.profesorId(), p.brojCasovaVezbi());
-            imePoIdu.put(p.profesorId(), p.profesorIme());
-        });
-
+        // Skup profesora koje je koordinator ukljucio u OVU rotaciju (unete predmete)
         Map<UUID, Integer> unetiPoProfesoru = new HashMap<>();
         for (KreirajRotacijuRequest.PredmetStavka st : req.predmeti()) {
             unetiPoProfesoru.merge(st.profesorId(), st.casovaNedeljno().intValue(), Integer::sum);
         }
 
+        // Detektovani profesori — samo oni koje je koordinator ukljucio se validiraju
+        Map<UUID, Integer> detektovaniPoProfesoru = new HashMap<>();
+        detekcija.profesori().stream()
+                .filter(p -> p.profesorId() != null)
+                .forEach(p -> detektovaniPoProfesoru.put(p.profesorId(), p.brojCasovaVezbi()));
+
+        // Provera: svi ukljuceni profesori moraju biti mapirani u sistem
+        // (jer RotPredmet.profesor je @NotNull Korisnik)
+        List<String> ukljuceniBezNaloga = detekcija.profesori().stream()
+                .filter(p -> p.profesorId() != null
+                        ? unetiPoProfesoru.containsKey(p.profesorId()) && !p.uSistemu()
+                        : false)
+                .map(DetekcijaVezbiResponse.ProfesorVezbi::profesorIme)
+                .toList();
+        if (!ukljuceniBezNaloga.isEmpty()) {
+            throw new ValidationException(
+                    "PROFESORI_VAN_SISTEMA",
+                    "Sledeci ukljuceni profesori nisu u sistemu kao korisnici: %s. "
+                            .formatted(String.join(", ", ukljuceniBezNaloga))
+                            + "Dodaj ih u Korisnici ili ih iskljuci iz rotacije.");
+        }
+
+        // Suma casova — samo za one koje je koordinator ukljucio
         for (DetekcijaVezbiResponse.ProfesorVezbi p : detekcija.profesori()) {
-            int uneto = unetiPoProfesoru.getOrDefault(p.profesorId(), 0);
+            if (p.profesorId() == null) continue; // bez naloga, korisnik ne moze ni da ukljuci
+            if (!unetiPoProfesoru.containsKey(p.profesorId())) continue; // iskljucen
+            int uneto = unetiPoProfesoru.get(p.profesorId());
             if (uneto != p.brojCasovaVezbi()) {
                 throw new ValidationException(
                         "SUMA_CASOVA",
@@ -173,6 +178,11 @@ public class RotacijaService {
                 throw new ValidationException(
                         "Profesor sa id %s nema casove vezbi u odeljenju".formatted(profesorId));
             }
+        }
+
+        // Bar jedan profesor mora biti ukljucen
+        if (unetiPoProfesoru.isEmpty()) {
+            throw new ValidationException("Rotacija mora ukljuciti bar jednog profesora vezbi.");
         }
 
         Odeljenje od = odeljenjeRepo.findById(req.odeljenjeId()).orElseThrow();
