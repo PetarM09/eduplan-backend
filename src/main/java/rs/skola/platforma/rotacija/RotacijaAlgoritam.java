@@ -1,6 +1,7 @@
 package rs.skola.platforma.rotacija;
 
 import org.springframework.stereotype.Component;
+import rs.skola.platforma.common.exception.ValidationException;
 import rs.skola.platforma.korisnici.domain.Korisnik;
 import rs.skola.platforma.raspored.domain.Dan;
 import rs.skola.platforma.rotacija.domain.RotDodela;
@@ -11,33 +12,36 @@ import rs.skola.platforma.rotacija.web.DetekcijaVezbiResponse;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
- * Blok-bazirani algoritam dodele grupa na termine vezbi.
+ * Algoritam dodele grupa na termine vezbi sa segmentacijom u chunkove od po 3 casa.
  *
- * Princip:
- *   1. Za svakog ukljucenog profesora, sortiramo njegove termine vezbi (dan, cas)
- *      i delimo ih po predmetima (prvih {@code casovaNedeljno} prvog predmeta,
- *      sledecih toliko drugog, ...).
- *   2. Termini se grupisu u "blokove" — uzastopni casovi istog profesora,
- *      istog predmeta i istog dana ide istoj grupi. To prati realnost vezbi
- *      koje su tipicno 2-3 casa zaredom u istom danu.
- *   3. Kroz N nedelja, blokove rotiramo linearno: grupa = ((i + w × broj_blokova) mod G) + 1.
- *      Time se postize:
- *      - u jednoj nedelji ista grupa se ne ponavlja kod razlicitih blokova
- *      - kroz ciklus, svaka grupa dobija priblizno isti broj blokova
+ * Pravila:
+ *   1. Termini istog profesora i istog predmeta u istom danu uzastopno se grupisu.
+ *      Ako profesor tog dana ima vise od {@link #TRAJANJE_BLOKA} casova u nizu, niz
+ *      se sece na chunkove od 3 casa — svaki chunk ide drugoj grupi (npr. 6 casova
+ *      Pon 1-6 = 2 chunk-a × 3 casa kojima ce biti dodeljene razlicite grupe).
+ *   2. Chunkovi se sortiraju po (dan, prvi cas, profesorId) — chunkovi koji se
+ *      preklapaju u istom terminu (dan, cas) automatski imaju razlicite indekse,
+ *      pa kroz linearni shift kroz nedelje ne mogu dobiti istu grupu.
+ *   3. Grupa se rotira kroz nedelje: grupa = ((i + w − 1) mod G) + 1.
+ *      Ravnomerna raspodela kroz ciklus.
  *
- * Primeri (G grupa, N nedelja, C casova nedeljno, B blokova nedeljno):
- *   - C=9, G=3, N=1, B=3 (3 dana × 3 casa): svaka nedelja G1, G2, G3
- *   - C=6, G=3, N=3, B=2 (2 dana × 3 casa): "G1G2, G3G1, G2G3"
- *   - C=3, G=3, N=3, B=1 (1 dan × 3 casa):  "G1, G2, G3"
+ * Validacija pre generisanja:
+ *   - Broj grupa mora biti >= maksimalan broj profesora u jednom terminu —
+ *     inace dva profesora u istom casu nuzno dobijaju istu grupu (konflikt).
  */
 @Component
 public class RotacijaAlgoritam {
+
+    /** Standardno trajanje jednog bloka vezbi u jednom danu. */
+    private static final int TRAJANJE_BLOKA = 3;
 
     public List<RotDodela> generisi(Rotacija r, DetekcijaVezbiResponse detekcija) {
         int g = r.getBrojGrupa();
@@ -71,8 +75,24 @@ public class RotacijaAlgoritam {
                         .comparing((DetekcijaVezbiResponse.TerminVezbi t) -> t.dan().ordinal())
                         .thenComparing(DetekcijaVezbiResponse.TerminVezbi::cas)));
 
-        // 4. Po profesoru, dodeli svakom terminu njegov predmet (sekvencijalno).
-        // Mapiraj (profesorId, dan, cas) -> RotPredmet.
+        // 4. Validacija: brojGrupa >= max profesora u terminu (samo ukljucenih)
+        int maxProfesoraUTerminu = 0;
+        for (DetekcijaVezbiResponse.TerminVezbi t : detekcija.termini()) {
+            int ukljuceni = 0;
+            for (UUID profId : t.profesoriIds()) {
+                if (profId != null && profesoriMap.containsKey(profId)) ukljuceni++;
+            }
+            maxProfesoraUTerminu = Math.max(maxProfesoraUTerminu, ukljuceni);
+        }
+        if (maxProfesoraUTerminu > g) {
+            throw new ValidationException(
+                    "MALO_GRUPA",
+                    "U nekom terminu istovremeno predaje %d profesora, a broj grupa je %d. " +
+                            "Povecaj broj grupa ili iskljuci nekog profesora."
+                            .formatted(maxProfesoraUTerminu, g));
+        }
+
+        // 5. Po profesoru, distribuiraj predmete po terminima — sekvencijalno.
         Map<KljucTerminProfesor, RotPredmet> terminPredmet = new HashMap<>();
         for (Map.Entry<UUID, List<DetekcijaVezbiResponse.TerminVezbi>> e : terminePoProfesoru.entrySet()) {
             UUID profId = e.getKey();
@@ -87,57 +107,88 @@ public class RotacijaAlgoritam {
             }
         }
 
-        // 5. Grupisi u blokove: (profesor, predmet, dan) -> lista termina (sortiranih po cas).
-        // LinkedHashMap zadrzava insertion order — stabilan redosled za rotaciju.
-        Map<BlokKljuc, List<DetekcijaVezbiResponse.TerminVezbi>> blokovi = new LinkedHashMap<>();
-        List<DetekcijaVezbiResponse.TerminVezbi> sortiraniTermini = new ArrayList<>(detekcija.termini());
-        sortiraniTermini.sort(Comparator
-                .comparing((DetekcijaVezbiResponse.TerminVezbi t) -> t.dan().ordinal())
-                .thenComparing(DetekcijaVezbiResponse.TerminVezbi::cas));
-
-        for (DetekcijaVezbiResponse.TerminVezbi t : sortiraniTermini) {
-            for (UUID profId : t.profesoriIds()) {
-                if (profId == null || !profesoriMap.containsKey(profId)) continue;
+        // 6. Grupisi termine u "raw blokove" = uzastopni casovi istog profesora,
+        //    istog predmeta u istom danu (par uzastopnih casova bez praznine).
+        Map<RawBlokKljuc, List<DetekcijaVezbiResponse.TerminVezbi>> rawBlokovi = new LinkedHashMap<>();
+        for (Map.Entry<UUID, List<DetekcijaVezbiResponse.TerminVezbi>> e : terminePoProfesoru.entrySet()) {
+            UUID profId = e.getKey();
+            List<DetekcijaVezbiResponse.TerminVezbi> termini = e.getValue();
+            RawBlokKljuc trenutni = null;
+            short ocekivaniCas = -1;
+            for (DetekcijaVezbiResponse.TerminVezbi t : termini) {
                 RotPredmet pred = terminPredmet.get(new KljucTerminProfesor(t.dan(), t.cas(), profId));
                 if (pred == null) continue;
-                BlokKljuc bk = new BlokKljuc(pred.getRedniBroj(), profId, pred.getNaziv(), t.dan());
-                blokovi.computeIfAbsent(bk, k -> new ArrayList<>()).add(t);
+                // Novi raw blok ako se promenio dan / predmet ili nije uzastopan cas
+                boolean nastavakBloka = trenutni != null
+                        && trenutni.dan() == t.dan()
+                        && trenutni.predmetNaziv().equals(pred.getNaziv())
+                        && t.cas() == ocekivaniCas;
+                if (!nastavakBloka) {
+                    trenutni = new RawBlokKljuc(profId, pred.getNaziv(), t.dan(),
+                            t.cas(), pred.getRedniBroj());
+                }
+                rawBlokovi.computeIfAbsent(trenutni, k -> new ArrayList<>()).add(t);
+                ocekivaniCas = (short) (t.cas() + 1);
             }
         }
 
-        // 6. Sortiraj blokove deterministicno: po redniBroj predmeta, pa po danu, pa po prvom casu.
-        List<Map.Entry<BlokKljuc, List<DetekcijaVezbiResponse.TerminVezbi>>> sortiraniBlokovi =
-                new ArrayList<>(blokovi.entrySet());
-        sortiraniBlokovi.sort((a, b) -> {
-            int cmp = Short.compare(a.getKey().redniBrojPredmeta(), b.getKey().redniBrojPredmeta());
+        // 7. Sece svaki raw blok na chunkove od TRAJANJE_BLOKA casova
+        List<Chunk> chunkovi = new ArrayList<>();
+        for (Map.Entry<RawBlokKljuc, List<DetekcijaVezbiResponse.TerminVezbi>> e : rawBlokovi.entrySet()) {
+            RawBlokKljuc bk = e.getKey();
+            List<DetekcijaVezbiResponse.TerminVezbi> termini = e.getValue();
+            Korisnik profesor = profesoriMap.get(bk.profesorId());
+            for (int start = 0; start < termini.size(); start += TRAJANJE_BLOKA) {
+                int end = Math.min(start + TRAJANJE_BLOKA, termini.size());
+                chunkovi.add(new Chunk(bk.profesorId(), bk.predmetNaziv(), profesor, bk.redniBrojPredmeta(),
+                        new ArrayList<>(termini.subList(start, end))));
+            }
+        }
+
+        // 8. Sortiraj chunkove po (dan, prvi cas, profesorId) — chunkovi koji se
+        //    preklapaju u istom terminu (dan, cas) ce imati indekse koji se razlikuju
+        //    za broj profesora u tom terminu — < G, pa razlicite grupe.
+        chunkovi.sort((a, b) -> {
+            DetekcijaVezbiResponse.TerminVezbi taPrvi = a.termini().get(0);
+            DetekcijaVezbiResponse.TerminVezbi tbPrvi = b.termini().get(0);
+            int cmp = Integer.compare(taPrvi.dan().ordinal(), tbPrvi.dan().ordinal());
             if (cmp != 0) return cmp;
-            cmp = Integer.compare(a.getKey().dan().ordinal(), b.getKey().dan().ordinal());
+            cmp = Short.compare(taPrvi.cas(), tbPrvi.cas());
             if (cmp != 0) return cmp;
-            Short prvi = a.getValue().get(0).cas();
-            Short drugi = b.getValue().get(0).cas();
-            return Short.compare(prvi, drugi);
+            return a.profesorId().compareTo(b.profesorId());
         });
 
-        int brojBlokovaNedeljno = sortiraniBlokovi.size();
-
-        // 7. Generisi dodele — po nedelji, blok dobija grupu (i + w × B) mod G + 1
+        // 9. Generisi dodele sa linearnim shift-om: grupa = ((i + w-1) mod G) + 1
         List<RotDodela> dodele = new ArrayList<>();
         for (short w = 1; w <= n; w++) {
-            int shift = (w - 1) * brojBlokovaNedeljno;
-            for (int i = 0; i < sortiraniBlokovi.size(); i++) {
-                Map.Entry<BlokKljuc, List<DetekcijaVezbiResponse.TerminVezbi>> blokEntry =
-                        sortiraniBlokovi.get(i);
-                BlokKljuc bk = blokEntry.getKey();
+            int shift = w - 1;
+            // Cuvamo koja je grupa vec dodeljena u (dan, cas) ove nedelje — radi
+            // sanity provere; jer sortiranje vec garantuje razlicitost, ali bezbedonosno.
+            Map<TerminKljuc, Set<Short>> grupeUTerminu = new HashMap<>();
+            for (int i = 0; i < chunkovi.size(); i++) {
+                Chunk c = chunkovi.get(i);
                 int grupa = ((i + shift) % g) + 1;
-                Korisnik profesor = profesoriMap.get(bk.profesorId());
-                for (DetekcijaVezbiResponse.TerminVezbi t : blokEntry.getValue()) {
+                for (DetekcijaVezbiResponse.TerminVezbi t : c.termini()) {
+                    TerminKljuc tk = new TerminKljuc(t.dan(), t.cas());
+                    Set<Short> postojece = grupeUTerminu.computeIfAbsent(tk, k -> new HashSet<>());
+                    if (postojece.contains((short) grupa)) {
+                        // Konflikt — pomeri grupu na sledecu slobodnu.
+                        for (int probaj = 1; probaj < g; probaj++) {
+                            short alt = (short) (((grupa - 1 + probaj) % g) + 1);
+                            if (!postojece.contains(alt)) {
+                                grupa = alt;
+                                break;
+                            }
+                        }
+                    }
+                    postojece.add((short) grupa);
                     dodele.add(RotDodela.builder()
                             .rotacija(r)
                             .brojNedelje(w)
                             .dan(t.dan())
                             .cas(t.cas())
-                            .profesor(profesor)
-                            .predmetNaziv(bk.predmetNaziv())
+                            .profesor(c.profesor())
+                            .predmetNaziv(c.predmetNaziv())
                             .brojGrupe((short) grupa)
                             .build());
                 }
@@ -148,5 +199,11 @@ public class RotacijaAlgoritam {
 
     private record KljucTerminProfesor(Dan dan, Short cas, UUID profesorId) {}
 
-    private record BlokKljuc(short redniBrojPredmeta, UUID profesorId, String predmetNaziv, Dan dan) {}
+    private record TerminKljuc(Dan dan, Short cas) {}
+
+    private record RawBlokKljuc(UUID profesorId, String predmetNaziv, Dan dan,
+                                 Short prviCas, Short redniBrojPredmeta) {}
+
+    private record Chunk(UUID profesorId, String predmetNaziv, Korisnik profesor,
+                          Short redniBrojPredmeta, List<DetekcijaVezbiResponse.TerminVezbi> termini) {}
 }
