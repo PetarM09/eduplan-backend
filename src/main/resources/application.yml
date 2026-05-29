@@ -37,9 +37,11 @@ spring:
         smtp:
           auth: ${MAIL_AUTH:false}
           starttls.enable: ${MAIL_STARTTLS:false}
-          connectiontimeout: 5000
-          timeout: 5000
-          writetimeout: 5000
+          starttls.required: ${MAIL_STARTTLS_REQUIRED:false}
+          ssl.trust: ${MAIL_SSL_TRUST:}
+          connectiontimeout: ${MAIL_CONNECT_TIMEOUT:15000}
+          timeout: ${MAIL_TIMEOUT:30000}
+          writetimeout: ${MAIL_WRITE_TIMEOUT:15000}
 
   servlet:
     multipart:
