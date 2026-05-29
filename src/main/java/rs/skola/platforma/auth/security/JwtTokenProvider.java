@@ -19,11 +19,6 @@ import java.util.Date;
 import java.util.HexFormat;
 import java.util.UUID;
 
-/**
- * Generisanje, parsiranje i hashiranje JWT tokena.
- * Access token: nosi {@code uid} (korisnikId), {@code sid} (skolaId, NULL za SUPER_ADMIN), {@code rol} (uloga).
- * Refresh token: opaque (nasumicni 256-bitni string), hashira se SHA-256 pre nego sto se cuva u bazi.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor

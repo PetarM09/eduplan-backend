@@ -21,10 +21,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * Registar predmeta skole. Predmet moze biti dodeljen vise odeljenja (N:M).
- * Sve operacije proveravaju da resurs pripada TenantContext.require() skoli.
- */
 @Service
 @RequiredArgsConstructor
 public class PredmetService {

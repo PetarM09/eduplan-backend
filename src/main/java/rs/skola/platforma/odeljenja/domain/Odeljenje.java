@@ -35,7 +35,6 @@ public class Odeljenje extends TenantAwareEntity {
     @Builder.Default
     private boolean aktivan = true;
 
-    /** Ljudski-citljiv label, npr. "4-1" za numericku oznaku, "3A" za slovnu. */
     public String label() {
         if (oznaka == null || oznaka.isBlank()) return String.valueOf(razred);
         boolean numerickaOznaka = oznaka.chars().allMatch(Character::isDigit);

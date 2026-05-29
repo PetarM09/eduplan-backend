@@ -24,10 +24,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Generise Excel (.xlsx) izvestaj za PP sluzbu: lista godisnjih planova, lista operativnih,
- * lista PP izvestaja i statistika — sve u zasebnim sheet-ovima.
- */
 @Service
 @RequiredArgsConstructor
 public class PPEksportService {

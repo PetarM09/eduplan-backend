@@ -52,10 +52,6 @@ public interface ZamenaRepository extends JpaRepository<Zamena, UUID> {
             """)
     List<Zamena> poStatusu(@Param("skolaId") UUID skolaId, @Param("status") ZamenaStatus status);
 
-    /**
-     * Broj zamena u kojima je nastavnik bio ZAMENIK u poslednjih {@code odDatuma} dana.
-     * Sluzi za sortiranje kandidata — manje zamena = bolji kandidat (ravnomerno opterecenje).
-     */
     @Query("""
             SELECT z.zamenik.id, COUNT(z) FROM Zamena z
             WHERE z.skolaId = :skolaId
@@ -70,10 +66,6 @@ public interface ZamenaRepository extends JpaRepository<Zamena, UUID> {
                                         @Param("odDatuma") LocalDate odDatuma,
                                         @Param("korisnikIds") List<UUID> korisnikIds);
 
-    /**
-     * Da li nastavnik vec ima drugu zamenu (kao zamenik) za isti dan i cas?
-     * Sprecava da jedan nastavnik bude predlozen dva puta za isti termin.
-     */
     @Query("""
             SELECT z.zamenik.id FROM Zamena z
             WHERE z.skolaId = :skolaId

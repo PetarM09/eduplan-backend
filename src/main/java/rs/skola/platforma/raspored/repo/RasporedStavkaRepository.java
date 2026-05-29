@@ -37,7 +37,6 @@ public interface RasporedStavkaRepository extends JpaRepository<RasporedStavka, 
                                       @Param("verzijaId") UUID verzijaId,
                                       @Param("dan") rs.skola.platforma.raspored.domain.Dan dan);
 
-    /** UUID-ovi nastavnika koji imaju cas u datom dan/cas iz aktivne verzije rasporeda. */
     @Query("""
             SELECT DISTINCT rs.korisnik.id FROM RasporedStavka rs
             WHERE rs.skolaId = :skolaId
@@ -50,7 +49,6 @@ public interface RasporedStavkaRepository extends JpaRepository<RasporedStavka, 
                                  @Param("dan") rs.skola.platforma.raspored.domain.Dan dan,
                                  @Param("cas") Short cas);
 
-    /** Sve stavke nastavnika u datom danu (za prijavu odsustva) iz aktivne verzije. */
     @Query("""
             SELECT rs FROM RasporedStavka rs
             LEFT JOIN FETCH rs.odeljenje
@@ -65,7 +63,6 @@ public interface RasporedStavkaRepository extends JpaRepository<RasporedStavka, 
                                                 @Param("korisnikId") UUID korisnikId,
                                                 @Param("dan") rs.skola.platforma.raspored.domain.Dan dan);
 
-    /** Sve stavke jednog odeljenja iz aktivne verzije rasporeda — za detekciju termina vezbi. */
     @Query("""
             SELECT rs FROM RasporedStavka rs
             LEFT JOIN FETCH rs.korisnik

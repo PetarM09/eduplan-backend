@@ -13,11 +13,6 @@ import rs.skola.platforma.odeljenja.domain.Odeljenje;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Rotacioni raspored za grupe ucenika jednog odeljenja koji prati casove vezbi
- * (termini gde 2+ profesora istovremeno predaju istom odeljenju). Sastoji se od
- * liste predmeta po profesoru i generisanih dodela grupa po terminima i nedeljama.
- */
 @Getter
 @Setter
 @Builder

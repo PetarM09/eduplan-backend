@@ -39,7 +39,6 @@ public class PPIzvestaj extends TenantAwareEntity {
     @Column(name = "skolska_godina", nullable = false, length = 9)
     private String skolskaGodina;
 
-    /** Slobodno strukturiran JSONB sa svim sekcijama izvestaja. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "podaci_json", columnDefinition = "jsonb")
     private Map<String, Object> podaci;

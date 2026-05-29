@@ -20,13 +20,6 @@ import rs.skola.platforma.common.tenant.TenantContext;
 import java.io.IOException;
 import java.util.List;
 
-/**
- * Validira Bearer JWT, postavlja SecurityContext i — kriticno — TenantContext
- * sa skola_id claim-om.
- *
- * <p>TenantContext.clear() je u finally bloku tako da nikad ne moze "procuriti"
- * iz jednog zahteva u sledeci kada Tomcat thread (ili virtual thread) bude reusovan.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor

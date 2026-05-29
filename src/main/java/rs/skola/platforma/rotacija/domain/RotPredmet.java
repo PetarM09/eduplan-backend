@@ -10,11 +10,6 @@ import rs.skola.platforma.korisnici.domain.Korisnik;
 
 import java.util.UUID;
 
-/**
- * Predmet vezbi koji konkretan profesor predaje u okviru rotacije. Profesor moze
- * imati 1+ predmet u istom odeljenju; suma {@code casovaNedeljno} svih njegovih
- * unosa mora biti jednaka broju detektovanih casova vezbi iz rasporeda.
- */
 @Getter
 @Setter
 @Builder

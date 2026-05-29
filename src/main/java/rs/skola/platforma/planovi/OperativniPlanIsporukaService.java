@@ -7,11 +7,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
-/**
- * Asinhroni wrapper koji delegira na {@link OperativniPlanObradaService}. Razdvojen u
- * zaseban bean da bi {@code @Transactional} u {@code obradi(...)} stvarno bio primenjen
- * (Spring proxy intercept-uje SAMO pozive izmedju razlicitih bean-ova).
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor

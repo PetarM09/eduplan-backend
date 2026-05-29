@@ -34,11 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Servis za upravljanje Godisnjim (globalnim) planom rada. Najvaznija stvar: pri svakom
- * cuvanju, sve nove teme i ishodi iz zahteva se automatski upisuju u katalog
- * kroz {@link KatalogService}, pa bivaju dostupne i u drugim planovima.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor

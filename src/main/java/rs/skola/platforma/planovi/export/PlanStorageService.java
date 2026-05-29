@@ -14,15 +14,6 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.UUID;
 
-/**
- * Cuva i cita Word/PDF fajlove sa lokalnog file-systema.
- *
- * <p>Putanja:
- * <pre>${app.storage.base-dir}/skole/{skola_id}/godisnji-planovi/{plan_id}/{plan|operativni}.{docx|pdf}</pre>
- *
- * <p>Citanje fajla obavezno proverava da {@code skola_id} u putanji odgovara onome
- * sto je trazeno — sprecava path-traversal i cross-tenant pristup.
- */
 @Slf4j
 @Service
 public class PlanStorageService {

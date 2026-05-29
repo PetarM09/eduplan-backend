@@ -35,7 +35,6 @@ public class GodisnjiPlanTema extends BaseEntity {
     @Builder.Default
     private Short redniBroj = 0;
 
-    /** Mapa meseci -> da li se predaje. Kljucevi: IX, X, XI, XII, I, II, III, IV, V, VI. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "meseci_json", columnDefinition = "jsonb")
     @Builder.Default

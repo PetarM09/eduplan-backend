@@ -9,13 +9,6 @@ import lombok.Setter;
 import rs.skola.platforma.common.domain.BaseEntity;
 import rs.skola.platforma.tenant.domain.Skola;
 
-/**
- * Sistemski tip casa ima skola_id = NULL i dostupan je svim skolama
- * (Obrada, Utvrdjivanje, Ponavljanje, Provera znanja, Sistematizacija, Kombinovani).
- * Skola moze dodati sopstvene tipove koji vaze samo unutar te skole.
- *
- * Zato ovaj entitet nasledjuje BaseEntity (a ne TenantAwareEntity) — skolaId je opcionalno.
- */
 @Getter
 @Setter
 @Builder

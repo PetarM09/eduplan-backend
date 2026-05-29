@@ -6,12 +6,6 @@ import jakarta.validation.constraints.*;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Zahtev za kreiranje rotacije.
- * Predmeti se grupisu po profesoru — za istog profesora moze biti vise stavki
- * (npr. Programski jezici 2 casa + Web 2 casa), suma se proverava nasuprot
- * detektovanim casovima vezbi iz rasporeda.
- */
 public record KreirajRotacijuRequest(
         @NotBlank @Size(max = 255) String naziv,
         @NotNull UUID odeljenjeId,

@@ -5,10 +5,6 @@ import org.springframework.data.domain.Page;
 import java.util.List;
 import java.util.function.Function;
 
-/**
- * Lagani DTO za pagininane odgovore — izbegava da se Spring-ov Page interni
- * format ({@code pageable}, {@code sort.unsorted} itd.) propagira do klijenta.
- */
 public record PageResponse<T>(
         List<T> content,
         int page,

@@ -9,11 +9,6 @@ import lombok.Setter;
 import rs.skola.platforma.common.domain.BaseEntity;
 import rs.skola.platforma.tenant.domain.Skola;
 
-/**
- * Sistemska metoda rada ima skola_id = NULL i dostupna je svim skolama
- * (Predavanje, Demonstracija, Grupni rad, Diskusija, Prakticna vezba, ...).
- * Skola moze dodati sopstvene metode.
- */
 @Getter
 @Setter
 @Builder

@@ -13,10 +13,6 @@ import rs.skola.platforma.korisnici.domain.Korisnik;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-/**
- * Refresh tokeni su pohranjeni hash-ovani (SHA-256) — nikad sirovi.
- * Logout = revoked TRUE; izlogovanje svih sesija = revoked TRUE za sve tokene korisnika.
- */
 @Getter
 @Setter
 @Builder

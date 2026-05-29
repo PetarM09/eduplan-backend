@@ -310,6 +310,5 @@ public class RotacijaService {
         );
     }
 
-    /** Kompozitni kljuc za grupisanje stavki rasporeda po terminu. */
     private record TerminKljuc(Dan dan, Short cas) {}
 }

@@ -12,7 +12,6 @@ import java.util.UUID;
 @Repository
 public interface TipCasaRepository extends JpaRepository<TipCasa, UUID> {
 
-    /** Sistemski (skola IS NULL) + skolski tipovi za datu skolu, samo aktivni. */
     @Query("""
             SELECT t FROM TipCasa t
             WHERE t.aktivan = true

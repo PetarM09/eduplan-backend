@@ -20,23 +20,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * StAX parser SpreadsheetML 2003 (.xml) rasporeda.
- *
- * <p>Format: tabela sa nastavnicima u redovima i kolonama 2..36 koje predstavljaju
- * dane i casove (5 dana x 7 casova). Vrednost u celiji je oznaka odeljenja
- * (npr. "4-1", "3A"). Prvi red obicno sadrzi zaglavlje (preskace se).
- *
- * <p>Sigurnost: parser eksplicitno onemogucava DTD i externe entitete (XXE) i
- * koalescira karaktere kako bi se izbegli "split text" napadi.
- */
 @Slf4j
 @Component
 public class XmlRasporedParser {
 
     private static final String NS_SS = "urn:schemas-microsoft-com:office:spreadsheet";
 
-    /** Kolone 2..36: 35 slotova, 5 dana x 7 casova (Pon 1..7 | Uto 1..7 | ... | Pet 1..7). */
     private static final Map<Integer, DanCas> MAPA_KOLONA = mapaKolona();
 
     public List<ParsedRasporedRed> parse(InputStream in) {
@@ -80,7 +69,6 @@ public class XmlRasporedParser {
         return redovi;
     }
 
-    /** Citamo Row dok ne dodjemo do njegovog kraja. */
     private ParsedRasporedRed parseRow(XMLEventReader reader) throws XMLStreamException {
         String nastavnik = null;
         List<ParsedRasporedRed.ParsedStavka> stavke = new ArrayList<>();
@@ -112,11 +100,6 @@ public class XmlRasporedParser {
         return null;
     }
 
-    /**
-     * Cita sav tekst unutar <Data> elementa Cell-a, ukljucujuci ugnjezdene HTML
-     * formatne tagove (Font, B, I...) koje SpreadsheetML 2003 obicno koristi.
-     * Pozicionira se na </Cell> kad zavrsi.
-     */
     private String procitajData(XMLEventReader reader) throws XMLStreamException {
         StringBuilder buffer = null;
         boolean unutarData = false;

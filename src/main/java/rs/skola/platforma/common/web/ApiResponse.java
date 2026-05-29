@@ -4,10 +4,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.time.OffsetDateTime;
 
-/**
- * Uniformni response wrapper za sve uspesne i neuspesne odgovore.
- * Greske su u {@link ErrorPayload}, dok success vraca {@code data} i prazan error.
- */
 public record ApiResponse<T>(
         boolean success,
         @JsonInclude(JsonInclude.Include.NON_NULL) T data,

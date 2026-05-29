@@ -7,11 +7,6 @@ import lombok.Setter;
 
 import java.util.UUID;
 
-/**
- * Roditeljski entitet za sve tabele sa podacima koji pripadaju jednoj skoli.
- * skola_id je NOT NULL i postavlja se iz TenantContext-a u service sloju —
- * NIKADA se ne prihvata kao parametar od klijenta.
- */
 @Getter
 @Setter
 @MappedSuperclass

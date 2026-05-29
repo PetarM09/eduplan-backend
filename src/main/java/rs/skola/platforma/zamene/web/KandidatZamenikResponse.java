@@ -7,6 +7,5 @@ public record KandidatZamenikResponse(
         String username,
         String ime,
         String prezime,
-        /** Broj zamena u poslednjih 30 dana u kojima je nastavnik bio zamenik (manje = vise pozeljan). */
         long brojZamena30d
 ) {}

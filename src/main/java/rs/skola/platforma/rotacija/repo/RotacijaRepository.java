@@ -21,11 +21,6 @@ public interface RotacijaRepository extends JpaRepository<Rotacija, UUID> {
             """)
     List<Rotacija> sveZaSkolu(@Param("skolaId") UUID skolaId);
 
-    /**
-     * Rotacije u kojima profesor predaje vezbe — pretrazuje kroz RotPredmet.profesor
-     * (a ne kreatora rotacije, koji je uvek KOORDINATOR). DISTINCT da izbegne dupli
-     * rezultat ako profesor ima vise predmeta u istoj rotaciji.
-     */
     @Query("""
             SELECT DISTINCT r FROM Rotacija r
             LEFT JOIN FETCH r.nastavnik

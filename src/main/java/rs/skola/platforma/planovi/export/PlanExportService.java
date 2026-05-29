@@ -37,10 +37,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Generisanje Word (.docx) i PDF dokumenta za Godisnji plan po skolskom obrascu.
- * Word koristi Apache POI XWPF, PDF koristi OpenPDF (cisti Java, bez LibreOffice-a).
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -48,14 +44,12 @@ public class PlanExportService {
 
     private static final List<String> MESECI = List.of("IX", "X", "XI", "XII", "I", "II", "III", "IV", "V", "VI");
 
-    /** Embedded TTF font za PDF — DejaVu Sans podrzava sva srpska latinska slova (c, c, s, z, dj). */
     private static volatile BaseFont BASE_REGULAR;
     private static volatile BaseFont BASE_BOLD;
 
     private final SkolaRepository skolaRepository;
     private final IshodRepository ishodRepository;
 
-    /** Ucitan TTF font iz classpath-a, sa Identity-H encoding za pun Unicode. Cache-ovan jer je ucitavanje ~10ms. */
     private static BaseFont baseFont(boolean bold) {
         BaseFont cache = bold ? BASE_BOLD : BASE_REGULAR;
         if (cache != null) return cache;
@@ -151,11 +145,6 @@ public class PlanExportService {
         doc.createParagraph();
     }
 
-    /**
-     * Tabela tema: jednostavna verzija sa 17 kolona (Rb, Oblast, 3 tipa casa, Ukupno,
-     * Ishodi, 10 meseci). Nema spojenih header-celija — kompromisi za jednostavnost
-     * generatora, ali svi podaci su prisutni.
-     */
     private void tabelaTema(XWPFDocument doc, GodisnjiPlan plan) {
         List<GodisnjiPlanTema> teme = plan.getTeme().stream()
                 .sorted(Comparator.comparing(GodisnjiPlanTema::getRedniBroj))
@@ -230,10 +219,6 @@ public class PlanExportService {
         return s == null ? "" : s;
     }
 
-    /**
-     * Ucitan ishode iz kataloga za temu povezanu sa godisnjim planom i sastavi
-     * tekstualni prikaz u jednoj ceili (bullet svaki ishod u svom redu).
-     */
     private String ishodiZaTemu(java.util.UUID skolaId, GodisnjiPlanTema gpt) {
         if (gpt == null || gpt.getTema() == null || gpt.getTema().getId() == null) return "";
         List<Ishod> ishodi = ishodRepository
@@ -254,10 +239,6 @@ public class PlanExportService {
 
     // ==================== PDF ====================
 
-    /**
-     * PDF generisanje kroz OpenPDF (samostalan Java PDF, bez ext. zavisnosti).
-     * Sadrzaj prati istu strukturu kao Word — manje formatiran, vise tabelarno.
-     */
     public byte[] generisiGodisnjiPlanPdf(GodisnjiPlan plan) {
         Skola skola = skolaRepository.findById(plan.getSkolaId()).orElse(null);
         ByteArrayOutputStream out = new ByteArrayOutputStream();

@@ -11,11 +11,6 @@ import rs.skola.platforma.tenant.domain.Skola;
 
 import java.time.OffsetDateTime;
 
-/**
- * SUPER_ADMIN nema povezanu skolu (skola IS NULL); sve ostale uloge je obavezno imaju.
- * Ova invarijanta je dodatno potvrdjena CHECK ogranicenjem u V1 migraciji.
- * Korisnik nije TenantAwareEntity zato sto SUPER_ADMIN egzistira van skola.
- */
 @Getter
 @Setter
 @Builder

@@ -14,15 +14,6 @@ import rs.skola.platforma.tenant.domain.Skola;
 
 import java.io.UnsupportedEncodingException;
 
-/**
- * Šalje generisani Word plan na mail adresu skole konfigurisanu kroz
- * {@code skole.mail_planovi}. Poziv je sinhroni — caller (PlanIsporukaService) je
- * vec u {@code @Async} kontekstu pa nemamo dvostruko nesting-anje.
- *
- * <p>From adresa se cita iz {@code app.mail.from} (env {@code MAIL_FROM}).
- * Format moze biti "Ime <adresa>" ili samo "adresa". Ako prop nije postavljen,
- * Spring pada na sistemski default (obicno mail.username sa servera).
- */
 @Slf4j
 @Service
 public class PlanMailService {
@@ -133,7 +124,6 @@ public class PlanMailService {
                 skola == null ? "" : "  Skola:            " + skola.getNaziv() + "\n");
     }
 
-    /** Postavlja From header iz konfiguracije ako je dostupno. */
     private void postaviFrom(MimeMessageHelper helper) throws jakarta.mail.MessagingException {
         if (fromAddress == null) return;
         try {

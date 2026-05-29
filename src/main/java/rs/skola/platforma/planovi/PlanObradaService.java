@@ -15,11 +15,6 @@ import rs.skola.platforma.tenant.repo.SkolaRepository;
 
 import java.util.UUID;
 
-/**
- * Transakciona obradi() logika za godisnji plan — izvojena iz {@link PlanIsporukaService}
- * da bi {@code @Transactional} bio stvarno aktivan kada se metoda pozove iz {@code @Async}
- * konteksta (interni self-poziv ne ide kroz Spring proxy).
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor

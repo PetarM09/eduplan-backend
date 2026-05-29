@@ -24,10 +24,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Servis koristi iskljucivo SUPER_ADMIN — kreira skole i njihove koordinatore.
- * Sigurnosno ogranicenje je u {@code SuperAdminController} kroz {@code @PreAuthorize("hasRole('SUPER_ADMIN')")}.
- */
 @Service
 @RequiredArgsConstructor
 public class TenantService {

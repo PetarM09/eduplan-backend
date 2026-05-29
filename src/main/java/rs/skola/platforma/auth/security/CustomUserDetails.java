@@ -9,10 +9,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Spring Security UserDetails wrapper. Pohranjuje sve sto JwtTokenProvider treba
- * da unese u JWT — id, skolaId, ulogu — da se izbegne dodatni DB poziv pri svakom zahtevu.
- */
 public record CustomUserDetails(
         UUID id,
         UUID skolaId,

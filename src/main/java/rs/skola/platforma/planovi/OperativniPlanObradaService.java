@@ -15,11 +15,6 @@ import rs.skola.platforma.tenant.repo.SkolaRepository;
 
 import java.util.UUID;
 
-/**
- * Transakciona "obradi" logika izvojena u poseban bean da bi {@code @Async} u
- * {@link OperativniPlanIsporukaService} mogao da je pozove preko Spring proxy-ja,
- * cime se {@code @Transactional} stvarno aktivira (interni self-poziv ne ide kroz proxy).
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor

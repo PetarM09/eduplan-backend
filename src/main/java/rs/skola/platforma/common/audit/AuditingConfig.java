@@ -29,7 +29,6 @@ public class AuditingConfig {
         };
     }
 
-    /** Spring Data podrazumevano vraca LocalDateTime — nasi @CreatedDate/@LastModifiedDate su OffsetDateTime. */
     @Bean
     public DateTimeProvider auditDateTimeProvider() {
         return () -> Optional.<TemporalAccessor>of(OffsetDateTime.now());

@@ -11,11 +11,6 @@ import rs.skola.platforma.raspored.domain.Dan;
 
 import java.util.UUID;
 
-/**
- * Pojedinacna dodela: u datom danu i casu jedne nedelje, koja grupa ucenika
- * je kod kog profesora i predmeta. Generise se algoritmom prilikom kreiranja
- * rotacije i prepravljanjem se ne menja — za novu varijantu se kreira nova rotacija.
- */
 @Getter
 @Setter
 @Builder

@@ -9,11 +9,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 import java.time.LocalDate;
 import java.util.Set;
 
-/**
- * Nastavnik bira datum i casove u kojima nece biti prisutan. Svaki cas postaje
- * zasebna PREDLOZENA zamena.
- * <p>Datum mora biti danas ili u buducnosti — retroaktivne zamene se ne dozvoljavaju.
- */
 public record PrijaviOdsustvoRequest(
         @NotNull
         @Future(message = "Datum mora biti u buducnosti")

@@ -22,9 +22,6 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Upravljanje PP izvestajima staresina. Idempotent po (skola, odeljenje, period, godina).
- */
 @Service
 @RequiredArgsConstructor
 public class PPService {

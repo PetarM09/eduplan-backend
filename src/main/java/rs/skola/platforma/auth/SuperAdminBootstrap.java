@@ -11,13 +11,6 @@ import rs.skola.platforma.korisnici.domain.Korisnik;
 import rs.skola.platforma.korisnici.domain.Uloga;
 import rs.skola.platforma.korisnici.repo.KorisnikRepository;
 
-/**
- * Pri prvom startu aplikacije, ako u bazi nema nijednog SUPER_ADMIN naloga,
- * kreira ga sa kredencijalima iz env varijabli (SUPERADMIN_USERNAME / _EMAIL / _LOZINKA).
- * Lozinka se bcrypt-uje sa istim PasswordEncoder-om kao i sve ostale lozinke.
- *
- * Posle uspesnog pokretanja u produkciji, OBAVEZNO promeni lozinku kroz API.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor

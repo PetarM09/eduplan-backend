@@ -21,11 +21,6 @@ import rs.skola.platforma.tenant.repo.SkolaRepository;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Upravljanje korisnicima unutar jedne skole. KOORDINATOR koristi ovaj servis za
- * kreiranje DIREKTOR/ADMIN/PP_SLUZBA/NASTAVNIK naloga. Skola se uvek dohvata iz
- * TenantContext-a — nikad iz request body-ja.
- */
 @Service
 @RequiredArgsConstructor
 public class KorisnikService {

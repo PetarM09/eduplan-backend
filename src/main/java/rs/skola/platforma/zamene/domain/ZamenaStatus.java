@@ -2,12 +2,6 @@ package rs.skola.platforma.zamene.domain;
 
 import java.util.Set;
 
-/**
- * State machine za zamene. Tranzicije su strogo ogranicene:
- *   PREDLOZENA -> ODOBRENA | ODBIJENA | OTKAZANA
- *   ODOBRENA   -> OTKAZANA
- *   ODBIJENA, OTKAZANA -> terminalna stanja, nema dalje
- */
 public enum ZamenaStatus {
 
     PREDLOZENA(Set.of()),  // popunjeno u static-init bloku ispod

@@ -40,7 +40,6 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class RasporedService {
 
-    /** "4-1" ili "4 1" ili "4/1" ili "3A" */
     private static final Pattern ODELJENJE = Pattern.compile(
             "^\\s*(?<razred>\\d{1,2})\\s*[-/\\s]?\\s*(?<oznaka>[A-Za-z0-9]{1,3})\\s*$");
 
@@ -243,11 +242,6 @@ public class RasporedService {
         return indeks.get(pokusaj);
     }
 
-    /**
-     * Pripreman tekst za fuzzy poredjenje: lowercase, trim, transliteracija srpskih
-     * latinickih dijakritika (č/ć/š/ž → c/c/s/z, đ → dj). Bez ovoga, "Kanlić Jelena"
-     * iz XML-a ne moze da se sparu sa korisnickim profilom "Kanlic Jelena" u bazi.
-     */
     private static String normalizujZaPoredjenje(String s) {
         if (s == null) return "";
         return s.toLowerCase().trim()

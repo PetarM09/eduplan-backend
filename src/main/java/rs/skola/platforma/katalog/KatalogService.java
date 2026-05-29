@@ -26,17 +26,6 @@ import rs.skola.platforma.predmeti.repo.PredmetRepository;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Centralni "pametni katalog" za teme, nastavne jedinice, ishode i padajuce menije.
- *
- * <p><b>findOrCreate pattern</b> — kljuc Sprint 3:
- * pri svakom upisu plana, sistem provari da li tema/jedinica vec postoji u katalogu
- * (po nazivu, vezana za isti predmet/temu i skolu). Ako da — reuse-uje postojeci zapis;
- * ako ne — kreira novi i automatski cuva za buducu upotrebu. Eliminise duplikate i
- * gradi "biblioteku znanja" skole bez dodatnih radnji nastavnika.
- *
- * <p>Sva poredjenja su case-insensitive zbog UNIQUE constraint-a na (skola, predmet, LOWER(naziv)).
- */
 @Service
 @RequiredArgsConstructor
 public class KatalogService {
@@ -70,10 +59,6 @@ public class KatalogService {
         return temaRepo.search(skolaId, predmetId, upit).stream().map(this::toResp).toList();
     }
 
-    /**
-     * Vraca postojecu temu po nazivu ili kreira novu. Auto-save u katalog kao
-     * posledica izrade plana.
-     */
     @Transactional
     public Tema findOrCreateTema(UUID predmetId, String naziv, Short redniBroj,
                                   Short casObrada, Short casUtvrd, Short casOstalo) {
@@ -145,10 +130,6 @@ public class KatalogService {
                 .toList();
     }
 
-    /**
-     * Ishodi su free-text, pa za njih nema UNIQUE constraint-a. Da bismo izbegli
-     * trivijalne duplikate, normalizujemo whitespace i tek onda upisujemo.
-     */
     @Transactional
     public Ishod kreirajIshod(UUID temaId, String opis) {
         UUID skolaId = TenantContext.require();

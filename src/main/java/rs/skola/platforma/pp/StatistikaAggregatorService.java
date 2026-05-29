@@ -14,17 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Agregira PP izvestaje skole u sumarnu statistiku. Svi izvestaji se sumiraju iskljucivo
- * u okviru jedne skole (skola_id se uvek dohvata iz TenantContext-a, NIKAD kao parametar).
- *
- * <p>Klјucevi koji se ocekuju u JSON podaci:
- * {@code ukupnoUcenika}, {@code ucenikaMuski}, {@code ucenikaZenski},
- * {@code prisustvo.opravdana}, {@code prisustvo.neopravdana},
- * {@code vladanje.{primerno,vrloDobro,dobro,zadovoljavajuce,nezadovoljavajuce}},
- * {@code uspeh.{odlican,vrloDobar,dobar,dovoljan,nedovoljan}}.
- * Nepostojeci kljucevi se ignorisu.
- */
 @Service
 @RequiredArgsConstructor
 public class StatistikaAggregatorService {

@@ -7,11 +7,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
-/**
- * Asinhroni wrapper za isporuku godisnjeg plana. Delegira na {@link PlanObradaService}
- * preko Spring proxy-ja kako bi {@code @Transactional} u {@code obradi(...)} stvarno
- * bio primenjen (interni self-poziv u istom bean-u ne ide kroz proxy).
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor

@@ -39,11 +39,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * Mesecni operativni plan. Idempotentno kreiranje po (skola, nastavnik, predmet, odeljenje,
- * mesec, godina) — drugi POST sa istim kljucem azurira postojeci plan i regenerise Word/PDF.
- * Pri svakom upisu, nove teme/jedinice/ishodi se automatski cuvaju u katalog.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor

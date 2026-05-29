@@ -23,11 +23,6 @@ import rs.skola.platforma.tenant.web.SkolaResponse;
 
 import java.util.UUID;
 
-/**
- * Endpointi koje koristi KOORDINATOR za podesavanje sopstvene skole.
- * Mail za PP/planove se NE postavlja kroz SUPER_ADMIN endpoint nego ovde —
- * svaka skola je odgovorna za svoju komunikaciju.
- */
 @Tag(name = "Moja skola", description = "Podesavanja skole koja menja koordinator")
 @RestController
 @RequestMapping("/api/v1/skola")

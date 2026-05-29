@@ -30,7 +30,6 @@ public class Skola extends BaseEntity {
     @Column(length = 255)
     private String adresa;
 
-    /** Mail adresa skole na koju se salju generisani planovi. Postavlja KOORDINATOR. */
     @Column(name = "mail_planovi", length = 255)
     private String mailPlanovi;
 
@@ -38,11 +37,9 @@ public class Skola extends BaseEntity {
     @Builder.Default
     private boolean aktivan = true;
 
-    /** Datum istica licence/aktivacije. NULL znaci bez vremenskog ogranicenja. */
     @Column(name = "vazi_do")
     private LocalDate vaziDo;
 
-    /** Skola je upotrebljiva ako je aktivna i ako joj rok vazenja nije istekao. */
     public boolean jeAktivnaNa(LocalDate datum) {
         if (!aktivan) return false;
         return vaziDo == null || !datum.isAfter(vaziDo);

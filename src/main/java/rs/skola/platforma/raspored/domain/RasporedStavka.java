@@ -23,12 +23,10 @@ public class RasporedStavka extends TenantAwareEntity {
     @JoinColumn(name = "verzija_id", nullable = false)
     private VerzijaRasporeda verzija;
 
-    /** Mapirani korisnicki nalog. Moze biti null ako u sistemu jos nema nastavnika sa tim imenom. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "korisnik_id")
     private Korisnik korisnik;
 
-    /** Ime nastavnika iz XML-a — uvek prisutno, sluzi kao primarni identifikator pre mapiranja. */
     @Column(name = "nastavnik_label", nullable = false, length = 255)
     private String nastavnikLabel;
 

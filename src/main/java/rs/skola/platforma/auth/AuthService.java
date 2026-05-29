@@ -91,10 +91,6 @@ public class AuthService {
                 .ifPresent(rt -> rt.setRevoked(true));
     }
 
-    /**
-     * Odbija prijavu kada je skola deaktivirana ili joj je istekao datum vazenja.
-     * SUPER_ADMIN nema povezanu skolu (skola == null) pa prolazi proveru.
-     */
     private void proveriSkolu(Korisnik k) {
         Skola s = k.getSkola();
         if (s == null) return; // SUPER_ADMIN

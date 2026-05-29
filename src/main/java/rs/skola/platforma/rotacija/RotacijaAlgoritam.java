@@ -19,29 +19,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * Algoritam dodele grupa na termine vezbi sa chunkovima od po 3 casa i
- * per-profesor rotacijom.
- *
- * Pravila:
- *   1. Termini istog profesora i istog predmeta u istom danu uzastopno se
- *      grupisu u "raw blok". Ako profesor tog dana ima vise od 3 casa zaredom,
- *      blok se sece na chunkove po {@link #TRAJANJE_BLOKA} casova.
- *   2. Chunkovi istog profesora dobijaju razlicite grupe — broji se indeks
- *      UNUTAR profesora (0, 1, 2, ...). Sa offset-om po profesoru (profOffset)
- *      i shift-om po nedelji, dobija se per-profesor rotacija koja istovremeno
- *      izbegava konflikte u istom terminu (dva profesora, ista grupa).
- *   3. grupa = ((indeksUnutarProf + profOffset + (w − 1)) mod G) + 1.
- *      Ako ipak dodje do konflikta u istom (dan, cas) zbog kombinacije, grupa
- *      chunk-a se pomera na sledecu slobodnu.
- *
- * Validacija:
- *   - brojGrupa >= max broj profesora u jednom terminu (ukljucenih u rotaciju).
- */
 @Component
 public class RotacijaAlgoritam {
 
-    /** Standardno trajanje jednog bloka vezbi u jednom danu (casova zaredom). */
     private static final int TRAJANJE_BLOKA = 3;
 
     public List<RotDodela> generisi(Rotacija r, DetekcijaVezbiResponse detekcija) {

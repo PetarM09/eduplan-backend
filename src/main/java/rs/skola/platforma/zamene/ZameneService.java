@@ -39,11 +39,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * Svi upiti i izmene proveravaju da resurs pripada {@code TenantContext.require()} skoli.
- * Kandidati za zamenika ukljucuju iskljucivo aktivne NASTAVNIK-e iz iste skole, koji nemaju
- * svoj cas u tom terminu i nisu vec predlozeni za istu zamenu.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -255,7 +250,6 @@ public class ZameneService {
         }
     }
 
-    /** Vraca {@code null} za nedelju — toga dana se ne odrzava nastava. */
     static Dan toDan(LocalDate datum) {
         DayOfWeek dow = datum.getDayOfWeek();
         return switch (dow) {
