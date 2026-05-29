@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -48,6 +49,7 @@ public class SkolaController {
 
     @PatchMapping("/mail-planovi")
     @PreAuthorize("hasRole('KOORDINATOR')")
+    @Transactional
     @Operation(summary = "Postavlja mail za primanje generisanih planova")
     public ApiResponse<SkolaResponse> postaviMailPlanovi(@Valid @RequestBody PostaviMailRequest req) {
         UUID skolaId = TenantContext.require();
@@ -56,6 +58,7 @@ public class SkolaController {
         // null/blank brise postojecu adresu
         String mail = req.mailPlanovi();
         s.setMailPlanovi(mail == null || mail.isBlank() ? null : mail.trim());
+        skolaRepository.save(s);
         return ApiResponse.ok(mapper.toResponse(s));
     }
 

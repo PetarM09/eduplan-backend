@@ -21,6 +21,8 @@ import org.apache.poi.xwpf.usermodel.XWPFTableCell;
 import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.springframework.stereotype.Service;
 import rs.skola.platforma.common.exception.BaseException;
+import rs.skola.platforma.katalog.domain.Ishod;
+import rs.skola.platforma.katalog.repo.IshodRepository;
 import rs.skola.platforma.planovi.domain.GodisnjiPlan;
 import rs.skola.platforma.planovi.domain.GodisnjiPlanTema;
 import rs.skola.platforma.planovi.domain.OpStavka;
@@ -47,6 +49,7 @@ public class PlanExportService {
     private static final List<String> MESECI = List.of("IX", "X", "XI", "XII", "I", "II", "III", "IV", "V", "VI");
 
     private final SkolaRepository skolaRepository;
+    private final IshodRepository ishodRepository;
 
     // ==================== WORD ====================
 
@@ -147,8 +150,7 @@ public class PlanExportService {
             upisi(row.getCell(4), broj(gpt.getCasOstalo()), false, 9, ParagraphAlignment.CENTER);
             upisi(row.getCell(5), broj(gpt.getUkupnoCasova()), false, 9, ParagraphAlignment.CENTER);
 
-            String ishodiText = gpt.getTema() == null || gpt.getTema().getNaziv() == null
-                    ? "" : ""; // ishodi se cuvaju per-tema u katalogu — prikaz u operativnom planu
+            String ishodiText = ishodiZaTemu(plan.getSkolaId(), gpt);
             upisi(row.getCell(6), ishodiText, false, 9, ParagraphAlignment.LEFT);
 
             Map<String, Boolean> meseci = gpt.getMeseci() == null ? Map.of() : gpt.getMeseci();
@@ -173,10 +175,20 @@ public class PlanExportService {
     private void upisi(XWPFTableCell cell, String text, boolean bold, int fontSize, ParagraphAlignment align) {
         XWPFParagraph p = cell.getParagraphs().isEmpty() ? cell.addParagraph() : cell.getParagraphs().get(0);
         p.setAlignment(align);
-        XWPFRun r = p.createRun();
-        r.setText(text == null ? "" : text);
-        r.setBold(bold);
-        r.setFontSize(fontSize);
+        String safe = text == null ? "" : text;
+        // Podrska za vise linija (npr. ishodi sa bullet-ima): split po \n, svaka
+        // linija dobija svoj run + addBreak izmedju.
+        String[] lines = safe.split("\\n", -1);
+        for (int i = 0; i < lines.length; i++) {
+            if (i > 0) {
+                XWPFRun rb = p.createRun();
+                rb.addBreak();
+            }
+            XWPFRun r = p.createRun();
+            r.setText(lines[i]);
+            r.setBold(bold);
+            r.setFontSize(fontSize);
+        }
     }
 
     private void ukloniBorder(XWPFTable t) {
@@ -185,6 +197,24 @@ public class PlanExportService {
 
     private static String sigurno(String s) {
         return s == null ? "" : s;
+    }
+
+    /**
+     * Ucitan ishode iz kataloga za temu povezanu sa godisnjim planom i sastavi
+     * tekstualni prikaz u jednoj ceili (bullet svaki ishod u svom redu).
+     */
+    private String ishodiZaTemu(java.util.UUID skolaId, GodisnjiPlanTema gpt) {
+        if (gpt == null || gpt.getTema() == null || gpt.getTema().getId() == null) return "";
+        List<Ishod> ishodi = ishodRepository
+                .findAllBySkolaIdAndTema_IdOrderByCreatedAtAsc(skolaId, gpt.getTema().getId());
+        if (ishodi.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        for (Ishod i : ishodi) {
+            if (i.getOpis() == null || i.getOpis().isBlank()) continue;
+            if (sb.length() > 0) sb.append("\n");
+            sb.append("• ").append(i.getOpis().trim());
+        }
+        return sb.toString();
     }
 
     private static String broj(Short s) {
@@ -257,7 +287,7 @@ public class PlanExportService {
                 t.addCell(new Phrase(broj(gpt.getCasUtvrd()), normalFont));
                 t.addCell(new Phrase(broj(gpt.getCasOstalo()), normalFont));
                 t.addCell(new Phrase(broj(gpt.getUkupnoCasova()), normalFont));
-                t.addCell(new Phrase("", normalFont));
+                t.addCell(new Phrase(ishodiZaTemu(plan.getSkolaId(), gpt), normalFont));
                 Map<String, Boolean> meseci = gpt.getMeseci() == null ? Map.of() : gpt.getMeseci();
                 for (String m : MESECI) {
                     boolean predaje = Boolean.TRUE.equals(meseci.get(m));
