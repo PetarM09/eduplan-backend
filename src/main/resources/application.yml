@@ -28,21 +28,23 @@ spring:
   mail:
     # Default je Mailpit kontejner iz docker-compose (lokalni razvoj bez auth-a).
     # U produkciji se sve override-uje kroz MAIL_* env varijable.
-    host: ${MAIL_HOST:localhost}
-    port: ${MAIL_PORT:1025}
-    username: ${MAIL_USER:}
-    password: ${MAIL_PASS:}
+    # Chain ${env.X:${X:default}} podrzava i .env (spring-dotenv koristi env. prefix)
+    # i pravu OS env varijablu i fallback default.
+    host: ${env.MAIL_HOST:${MAIL_HOST:localhost}}
+    port: ${env.MAIL_PORT:${MAIL_PORT:1025}}
+    username: ${env.MAIL_USER:${MAIL_USER:}}
+    password: ${env.MAIL_PASS:${MAIL_PASS:}}
     properties:
       mail:
         smtp:
-          auth: ${MAIL_AUTH:false}
-          starttls.enable: ${MAIL_STARTTLS:false}
-          starttls.required: ${MAIL_STARTTLS_REQUIRED:false}
-          ssl.trust: ${MAIL_SSL_TRUST:}
-          debug: ${MAIL_DEBUG:false}
-          connectiontimeout: ${MAIL_CONNECT_TIMEOUT:15000}
-          timeout: ${MAIL_TIMEOUT:30000}
-          writetimeout: ${MAIL_WRITE_TIMEOUT:15000}
+          auth: ${env.MAIL_AUTH:${MAIL_AUTH:false}}
+          starttls.enable: ${env.MAIL_STARTTLS:${MAIL_STARTTLS:false}}
+          starttls.required: ${env.MAIL_STARTTLS_REQUIRED:${MAIL_STARTTLS_REQUIRED:false}}
+          ssl.trust: ${env.MAIL_SSL_TRUST:${MAIL_SSL_TRUST:}}
+          debug: ${env.MAIL_DEBUG:${MAIL_DEBUG:false}}
+          connectiontimeout: ${env.MAIL_CONNECT_TIMEOUT:${MAIL_CONNECT_TIMEOUT:15000}}
+          timeout: ${env.MAIL_TIMEOUT:${MAIL_TIMEOUT:30000}}
+          writetimeout: ${env.MAIL_WRITE_TIMEOUT:${MAIL_WRITE_TIMEOUT:15000}}
 
   servlet:
     multipart:
@@ -97,11 +99,11 @@ app:
     # mail prepustiti ali primaoci ce ga skoro sigurno tretirati kao spam
     # (DKIM/SPF check ne prolazi za drugi domen). Resenje: postavi MAIL_FROM
     # na istu adresu kao MAIL_USER, a u MAIL_REPLY_TO stavi zeljenu adresu.
-    from: ${MAIL_FROM:}
+    from: ${env.MAIL_FROM:${MAIL_FROM:}}
     # Reply-To header: ako primalac klikne "Reply", odgovor ide na ovu adresu
     # (ne na From). Korisno kad From mora biti gmail/workspace, ali zelis
     # odgovori da idu na poseban no-reply ili domain mail.
-    reply-to: ${MAIL_REPLY_TO:}
+    reply-to: ${env.MAIL_REPLY_TO:${MAIL_REPLY_TO:}}
 
 logging:
   level:
