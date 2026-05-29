@@ -85,6 +85,11 @@ app:
     core-pool-size: 4
     max-pool-size: 16
     queue-capacity: 100
+  mail:
+    # From adresa za sve odlazne mail-ove. Format moze biti "ime <adresa>"
+    # ili samo adresa. Ako nije postavljen, fallback je MAIL_USER (Spring
+    # default ponasanje vraca username kao envelope sender).
+    from: ${MAIL_FROM:}
 
 logging:
   level:
