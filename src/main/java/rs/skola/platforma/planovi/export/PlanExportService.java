@@ -3,10 +3,10 @@ package rs.skola.platforma.planovi.export;
 import com.lowagie.text.Document;
 import com.lowagie.text.Element;
 import com.lowagie.text.Font;
-import com.lowagie.text.FontFactory;
 import com.lowagie.text.PageSize;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.Phrase;
+import com.lowagie.text.pdf.BaseFont;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
@@ -48,8 +48,39 @@ public class PlanExportService {
 
     private static final List<String> MESECI = List.of("IX", "X", "XI", "XII", "I", "II", "III", "IV", "V", "VI");
 
+    /** Embedded TTF font za PDF — DejaVu Sans podrzava sva srpska latinska slova (c, c, s, z, dj). */
+    private static volatile BaseFont BASE_REGULAR;
+    private static volatile BaseFont BASE_BOLD;
+
     private final SkolaRepository skolaRepository;
     private final IshodRepository ishodRepository;
+
+    /** Ucitan TTF font iz classpath-a, sa Identity-H encoding za pun Unicode. Cache-ovan jer je ucitavanje ~10ms. */
+    private static BaseFont baseFont(boolean bold) {
+        BaseFont cache = bold ? BASE_BOLD : BASE_REGULAR;
+        if (cache != null) return cache;
+        synchronized (PlanExportService.class) {
+            cache = bold ? BASE_BOLD : BASE_REGULAR;
+            if (cache != null) return cache;
+            String resource = bold ? "fonts/DejaVuSans-Bold.ttf" : "fonts/DejaVuSans.ttf";
+            try (var is = PlanExportService.class.getClassLoader().getResourceAsStream(resource)) {
+                if (is == null) {
+                    throw new IllegalStateException("Font resource ne postoji: " + resource);
+                }
+                byte[] bytes = is.readAllBytes();
+                BaseFont bf = BaseFont.createFont(
+                        resource, BaseFont.IDENTITY_H, BaseFont.EMBEDDED, true, bytes, null);
+                if (bold) BASE_BOLD = bf; else BASE_REGULAR = bf;
+                return bf;
+            } catch (Exception ex) {
+                throw new IllegalStateException("Ne mogu da ucitam font " + resource, ex);
+            }
+        }
+    }
+
+    private static Font pdfFont(boolean bold, float size, Color color) {
+        return new Font(baseFont(bold), size, Font.NORMAL, color);
+    }
 
     // ==================== WORD ====================
 
@@ -235,9 +266,9 @@ public class PlanExportService {
             PdfWriter.getInstance(doc, out);
             doc.open();
 
-            Font naslovFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, Color.BLACK);
-            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, Color.BLACK);
-            Font normalFont = FontFactory.getFont(FontFactory.HELVETICA, 10, Color.BLACK);
+            Font naslovFont = pdfFont(true, 14, Color.BLACK);
+            Font headerFont = pdfFont(true, 10, Color.BLACK);
+            Font normalFont = pdfFont(false, 10, Color.BLACK);
 
             doc.add(new Paragraph(skola == null ? "" : skola.getNaziv(), naslovFont));
             if (skola != null && skola.getGrad() != null) {
@@ -408,9 +439,9 @@ public class PlanExportService {
             PdfWriter.getInstance(doc, out);
             doc.open();
 
-            Font naslovFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, Color.BLACK);
-            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, Color.BLACK);
-            Font normalFont = FontFactory.getFont(FontFactory.HELVETICA, 9, Color.BLACK);
+            Font naslovFont = pdfFont(true, 14, Color.BLACK);
+            Font headerFont = pdfFont(true, 9, Color.BLACK);
+            Font normalFont = pdfFont(false, 9, Color.BLACK);
 
             doc.add(new Paragraph("OPERATIVNI PLAN RADA — " + nazivMeseca(plan.getMesec()), naslovFont));
             doc.add(new Paragraph("Predmet: " + sigurno(plan.getPredmet().getNaziv())
