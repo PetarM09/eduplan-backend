@@ -39,6 +39,7 @@ spring:
           starttls.enable: ${MAIL_STARTTLS:false}
           starttls.required: ${MAIL_STARTTLS_REQUIRED:false}
           ssl.trust: ${MAIL_SSL_TRUST:}
+          debug: ${MAIL_DEBUG:false}
           connectiontimeout: ${MAIL_CONNECT_TIMEOUT:15000}
           timeout: ${MAIL_TIMEOUT:30000}
           writetimeout: ${MAIL_WRITE_TIMEOUT:15000}
@@ -91,7 +92,16 @@ app:
     # From adresa za sve odlazne mail-ove. Format moze biti "ime <adresa>"
     # ili samo adresa. Ako nije postavljen, fallback je MAIL_USER (Spring
     # default ponasanje vraca username kao envelope sender).
+    #
+    # VAZNO za Gmail: ako MAIL_FROM adresa nije ista kao MAIL_USER, Gmail ce
+    # mail prepustiti ali primaoci ce ga skoro sigurno tretirati kao spam
+    # (DKIM/SPF check ne prolazi za drugi domen). Resenje: postavi MAIL_FROM
+    # na istu adresu kao MAIL_USER, a u MAIL_REPLY_TO stavi zeljenu adresu.
     from: ${MAIL_FROM:}
+    # Reply-To header: ako primalac klikne "Reply", odgovor ide na ovu adresu
+    # (ne na From). Korisno kad From mora biti gmail/workspace, ali zelis
+    # odgovori da idu na poseban no-reply ili domain mail.
+    reply-to: ${MAIL_REPLY_TO:}
 
 logging:
   level:

@@ -30,9 +30,11 @@ public class PlanMailService {
     private final JavaMailSender mailSender;
     private final String fromAddress;
     private final String fromName;
+    private final String replyTo;
 
     public PlanMailService(JavaMailSender mailSender,
-                            @Value("${app.mail.from:}") String mailFrom) {
+                            @Value("${app.mail.from:}") String mailFrom,
+                            @Value("${app.mail.reply-to:}") String mailReplyTo) {
         this.mailSender = mailSender;
         // Razdvajamo "Ime <adresa>" na ime i adresu — Spring zahteva to za setFrom(adresa, ime)
         String trimmed = mailFrom == null ? "" : mailFrom.trim();
@@ -44,16 +46,19 @@ public class PlanMailService {
             this.fromName = null;
             this.fromAddress = trimmed.isEmpty() ? null : trimmed;
         }
+        this.replyTo = (mailReplyTo == null || mailReplyTo.isBlank()) ? null : mailReplyTo.trim();
     }
 
     public void posaljiGodisnjiPlan(GodisnjiPlan plan, Skola skola, byte[] wordBytes, String primalac) {
+        String subject = "Godisnji plan rada — " + plan.getNastavnik().punoIme()
+                + " — " + plan.getPredmet().getNaziv() + " (" + plan.getSkolskaGodina() + ")";
         try {
             MimeMessage msg = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
             postaviFrom(helper);
+            if (replyTo != null) helper.setReplyTo(replyTo);
             helper.setTo(primalac);
-            helper.setSubject("Godisnji plan rada — " + plan.getNastavnik().punoIme()
-                    + " — " + plan.getPredmet().getNaziv() + " (" + plan.getSkolskaGodina() + ")");
+            helper.setSubject(subject);
             helper.setText(telo(plan, skola), false);
 
             String fileName = "GodisnjiPlan_%s_%s.docx".formatted(
@@ -63,22 +68,26 @@ public class PlanMailService {
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
 
             mailSender.send(msg);
-            log.info("Poslat godisnji plan {} na {}", plan.getId(), primalac);
+            log.info("Poslat godisnji plan {} | From={} | To={} | Reply-To={} | Subject={}",
+                    plan.getId(), opisiFrom(), primalac, replyTo == null ? "-" : replyTo, subject);
         } catch (Exception ex) {
-            log.error("Greska pri slanju mail-a za plan {}: {}", plan.getId(), ex.getMessage(), ex);
+            log.error("Greska pri slanju mail-a za plan {} (primalac={}): {}",
+                    plan.getId(), primalac, ex.getMessage(), ex);
         }
     }
 
     public void posaljiOperativniPlan(OperativniPlan plan, Skola skola, byte[] wordBytes, String primalac) {
+        String subject = "Operativni plan — " + plan.getNastavnik().punoIme()
+                + " — " + plan.getPredmet().getNaziv()
+                + " — " + plan.getOdeljenje().label()
+                + " (" + nazivMeseca(plan.getMesec()) + " " + plan.getSkolskaGodina() + ")";
         try {
             MimeMessage msg = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
             postaviFrom(helper);
+            if (replyTo != null) helper.setReplyTo(replyTo);
             helper.setTo(primalac);
-            helper.setSubject("Operativni plan — " + plan.getNastavnik().punoIme()
-                    + " — " + plan.getPredmet().getNaziv()
-                    + " — " + plan.getOdeljenje().label()
-                    + " (" + nazivMeseca(plan.getMesec()) + " " + plan.getSkolskaGodina() + ")");
+            helper.setSubject(subject);
             helper.setText(teloOperativnog(plan, skola), false);
 
             String fileName = "OperativniPlan_%s_%s_%s_%s.docx".formatted(
@@ -90,10 +99,17 @@ public class PlanMailService {
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
 
             mailSender.send(msg);
-            log.info("Poslat operativni plan {} na {}", plan.getId(), primalac);
+            log.info("Poslat operativni plan {} | From={} | To={} | Reply-To={} | Subject={}",
+                    plan.getId(), opisiFrom(), primalac, replyTo == null ? "-" : replyTo, subject);
         } catch (Exception ex) {
-            log.error("Greska pri slanju mail-a za operativni plan {}: {}", plan.getId(), ex.getMessage(), ex);
+            log.error("Greska pri slanju mail-a za operativni plan {} (primalac={}): {}",
+                    plan.getId(), primalac, ex.getMessage(), ex);
         }
+    }
+
+    private String opisiFrom() {
+        if (fromAddress == null) return "(default mail.username)";
+        return fromName == null ? fromAddress : fromName + " <" + fromAddress + ">";
     }
 
     private String teloOperativnog(OperativniPlan plan, Skola skola) {
