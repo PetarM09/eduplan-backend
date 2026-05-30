@@ -213,9 +213,13 @@ public class RasporedService {
 
     private Map<String, Korisnik> indeksKorisnikaSkole(UUID skolaId) {
         Map<String, Korisnik> mapa = new HashMap<>();
-        for (Korisnik k : korisnikRepo.findAllBySkolaIdAndUlogaOrderByPrezimeAscImeAsc(skolaId, Uloga.NASTAVNIK)) {
-            for (String klj : kljuceviKorisnika(k)) {
-                mapa.putIfAbsent(klj, k);
+        // Koordinator je takodje nastavnik — moze imati raspored i drzati casove.
+        Uloga[] uloge = {Uloga.NASTAVNIK, Uloga.KOORDINATOR};
+        for (Uloga u : uloge) {
+            for (Korisnik k : korisnikRepo.findAllBySkolaIdAndUlogaOrderByPrezimeAscImeAsc(skolaId, u)) {
+                for (String klj : kljuceviKorisnika(k)) {
+                    mapa.putIfAbsent(klj, k);
+                }
             }
         }
         return mapa;
