@@ -37,7 +37,7 @@ public class PPController {
     // -------- IZVESTAJI (starešina) --------
 
     @PostMapping("/izvestaj")
-    @PreAuthorize("hasRole('NASTAVNIK')")
+    @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
     @Operation(summary = "Kreiraj ili azuriraj PP izvestaj za odeljenje (staresina)")
     public ApiResponse<PPIzvestajResponse> kreirajIzvestaj(@AuthenticationPrincipal CustomUserDetails ja,
             @Valid @RequestBody PPIzvestajRequest req) {
@@ -45,7 +45,7 @@ public class PPController {
     }
 
     @PostMapping("/izvestaj/{id}/podnesi")
-    @PreAuthorize("hasRole('NASTAVNIK')")
+    @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
     public ApiResponse<PPIzvestajResponse> podnesi(@PathVariable UUID id,
             @AuthenticationPrincipal CustomUserDetails ja) {
         return ApiResponse.ok(ppService.podnesi(id, ja));
@@ -64,7 +64,7 @@ public class PPController {
     }
 
     @GetMapping("/izvestaji/moji")
-    @PreAuthorize("hasRole('NASTAVNIK')")
+    @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
     public ApiResponse<List<PPIzvestajResponse>> mojiIzvestaji(@AuthenticationPrincipal CustomUserDetails ja,
             @RequestParam(required = false) String skolskaGodina) {
         return ApiResponse.ok(ppService.mojiIzvestaji(ja, skolskaGodina));

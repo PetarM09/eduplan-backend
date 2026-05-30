@@ -127,8 +127,10 @@ public class ZameneService {
         // Odsutni sam sebe ne moze biti zamenik
         zauzeti.add(z.getOdsutni().getId());
 
-        List<Korisnik> svi = korisnikRepository
-                .findAllBySkolaIdAndUlogaOrderByPrezimeAscImeAsc(skolaId, Uloga.NASTAVNIK);
+        List<Korisnik> svi = new java.util.ArrayList<>(korisnikRepository
+                .findAllBySkolaIdAndUlogaOrderByPrezimeAscImeAsc(skolaId, Uloga.NASTAVNIK));
+        svi.addAll(korisnikRepository
+                .findAllBySkolaIdAndUlogaOrderByPrezimeAscImeAsc(skolaId, Uloga.KOORDINATOR));
 
         List<Korisnik> slobodni = svi.stream()
                 .filter(k -> k.isAktivan() && !zauzeti.contains(k.getId()))
@@ -167,8 +169,9 @@ public class ZameneService {
         if (zamenik.getSkola() == null || !skolaId.equals(zamenik.getSkola().getId())) {
             throw new TenantViolationException("Predlozeni zamenik nije iz iste skole");
         }
-        if (zamenik.getUloga() != Uloga.NASTAVNIK || !zamenik.isAktivan()) {
-            throw new ValidationException("Zamenik mora biti aktivan NASTAVNIK");
+        if ((zamenik.getUloga() != Uloga.NASTAVNIK && zamenik.getUloga() != Uloga.KOORDINATOR)
+                || !zamenik.isAktivan()) {
+            throw new ValidationException("Zamenik mora biti aktivan nastavnik ili koordinator");
         }
         if (zamenik.getId().equals(z.getOdsutni().getId())) {
             throw new ValidationException("Odsutni nastavnik ne moze biti svoj zamenik");

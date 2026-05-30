@@ -49,7 +49,7 @@ public class RotacijaController {
     }
 
     @GetMapping("/moje")
-    @PreAuthorize("hasRole('NASTAVNIK')")
+    @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
     @Operation(summary = "Rotacije u kojima trenutni nastavnik predaje vezbe")
     public ApiResponse<List<RotacijaResponse>> moje(@AuthenticationPrincipal CustomUserDetails ja) {
         return ApiResponse.ok(service.moje(ja));

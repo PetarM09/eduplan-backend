@@ -31,7 +31,7 @@ public class ZameneController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('NASTAVNIK')")
+    @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
     @Operation(summary = "Prijava odsustva — kreira PREDLOZENA zamene za navedene casove")
     public ApiResponse<List<ZamenaResponse>> prijaviOdsustvo(@AuthenticationPrincipal CustomUserDetails ja,
                                                               @Valid @RequestBody PrijaviOdsustvoRequest req) {
@@ -47,14 +47,14 @@ public class ZameneController {
     }
 
     @GetMapping("/moje/odsutni")
-    @PreAuthorize("hasRole('NASTAVNIK')")
+    @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
     @Operation(summary = "Moje zamene gde sam ja prijavio odsustvo")
     public ApiResponse<List<ZamenaResponse>> mojeKaoOdsutni(@AuthenticationPrincipal CustomUserDetails ja) {
         return ApiResponse.ok(service.mojeKaoOdsutni(ja));
     }
 
     @GetMapping("/moje/zamenik")
-    @PreAuthorize("hasRole('NASTAVNIK')")
+    @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
     @Operation(summary = "Moje zamene gde sam ja zamenik")
     public ApiResponse<List<ZamenaResponse>> mojeKaoZamenik(@AuthenticationPrincipal CustomUserDetails ja) {
         return ApiResponse.ok(service.mojeKaoZamenik(ja));

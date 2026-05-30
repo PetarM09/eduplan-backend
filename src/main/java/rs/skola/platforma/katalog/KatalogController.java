@@ -70,7 +70,7 @@ public class KatalogController {
     }
 
     @PostMapping("/ishodi")
-    @PreAuthorize("hasRole('NASTAVNIK')")
+    @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
     @Operation(summary = "Dodaje novi ishod za temu (auto-save u katalog)")
     public ApiResponse<IshodResponse> kreirajIshod(@RequestBody KreirajIshodRequest req) {
         var i = service.kreirajIshod(req.temaId(), req.opis());

@@ -38,7 +38,7 @@ public class GodisnjiPlanController {
     private final PlanStorageService storageService;
 
     @PostMapping
-    @PreAuthorize("hasRole('NASTAVNIK')")
+    @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
     @Operation(summary = "Kreiraj ili azuriraj plan (idempotentno po predmet+godina+nastavnik)")
     public ApiResponse<GodisnjiPlanResponse> kreiraj(@AuthenticationPrincipal CustomUserDetails ja,
                                                       @Valid @RequestBody KreirajGodisnjiPlanRequest req) {
@@ -46,7 +46,7 @@ public class GodisnjiPlanController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('NASTAVNIK')")
+    @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
     @Operation(summary = "Azuriraj plan kroz isti payload — regenerise Word/PDF i salje mail")
     public ApiResponse<GodisnjiPlanResponse> azuriraj(@PathVariable UUID id,
                                                       @AuthenticationPrincipal CustomUserDetails ja,
@@ -56,7 +56,7 @@ public class GodisnjiPlanController {
     }
 
     @PostMapping("/{id}/podnesi")
-    @PreAuthorize("hasRole('NASTAVNIK')")
+    @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
     @Operation(summary = "Promeni status iz NACRT u PODNET")
     public ApiResponse<GodisnjiPlanResponse> podnesi(@PathVariable UUID id,
                                                       @AuthenticationPrincipal CustomUserDetails ja) {
@@ -64,7 +64,7 @@ public class GodisnjiPlanController {
     }
 
     @GetMapping("/me")
-    @PreAuthorize("hasRole('NASTAVNIK')")
+    @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
     @Operation(summary = "Moji godisnji planovi")
     public ApiResponse<List<GodisnjiPlanResponse>> mojiPlanovi(@AuthenticationPrincipal CustomUserDetails ja) {
         return ApiResponse.ok(service.mojiPlanovi(ja));

@@ -38,7 +38,7 @@ public class OperativniPlanController {
     private final PlanStorageService storageService;
 
     @PostMapping
-    @PreAuthorize("hasRole('NASTAVNIK')")
+    @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
     @Operation(summary = "Kreiraj ili azuriraj operativni plan (idempotentno po predmet+odeljenje+mesec+godina)")
     public ApiResponse<OperativniPlanResponse> kreiraj(@AuthenticationPrincipal CustomUserDetails ja,
                                                         @Valid @RequestBody KreirajOperativniPlanRequest req) {
@@ -46,14 +46,14 @@ public class OperativniPlanController {
     }
 
     @PostMapping("/{id}/podnesi")
-    @PreAuthorize("hasRole('NASTAVNIK')")
+    @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
     public ApiResponse<OperativniPlanResponse> podnesi(@PathVariable UUID id,
                                                         @AuthenticationPrincipal CustomUserDetails ja) {
         return ApiResponse.ok(service.podnesi(id, ja));
     }
 
     @PostMapping("/{id}/kloniraj")
-    @PreAuthorize("hasRole('NASTAVNIK')")
+    @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
     @Operation(summary = "Klonira plan u drugu skolsku godinu (zadrzava sve stavke, briše evaluaciju)")
     public ApiResponse<OperativniPlanResponse> kloniraj(@PathVariable UUID id,
                                                          @RequestParam String novaSkolskaGodina,
@@ -62,7 +62,7 @@ public class OperativniPlanController {
     }
 
     @GetMapping("/me")
-    @PreAuthorize("hasRole('NASTAVNIK')")
+    @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
     public ApiResponse<List<OperativniPlanResponse>> mojiPlanovi(@AuthenticationPrincipal CustomUserDetails ja,
                                                                   @RequestParam(required = false) Short mesec,
                                                                   @RequestParam(required = false) UUID predmetId,
