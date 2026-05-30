@@ -150,6 +150,13 @@ public class GodisnjiPlanService {
         return toResponse(plan);
     }
 
+    @Transactional
+    public void obrisi(UUID planId) {
+        UUID skolaId = TenantContext.require();
+        GodisnjiPlan plan = nadji(planId, skolaId);
+        planRepo.delete(plan);
+    }
+
     // -------- helpers --------
 
     private GodisnjiPlanTema prepraviStavku(UUID predmetId, GodisnjiPlan plan,

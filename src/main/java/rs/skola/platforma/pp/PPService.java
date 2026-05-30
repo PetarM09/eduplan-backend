@@ -116,6 +116,13 @@ public class PPService {
         return toResponse(nadji(id, skolaId));
     }
 
+    @Transactional
+    public void obrisi(UUID id) {
+        UUID skolaId = TenantContext.require();
+        PPIzvestaj izv = nadji(id, skolaId);
+        repo.delete(izv);
+    }
+
     private PPIzvestaj nadji(UUID id, UUID skolaId) {
         PPIzvestaj i = repo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("PP izvestaj", id));

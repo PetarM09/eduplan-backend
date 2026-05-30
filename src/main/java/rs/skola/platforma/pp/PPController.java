@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -39,14 +40,14 @@ public class PPController {
     @PreAuthorize("hasRole('NASTAVNIK')")
     @Operation(summary = "Kreiraj ili azuriraj PP izvestaj za odeljenje (staresina)")
     public ApiResponse<PPIzvestajResponse> kreirajIzvestaj(@AuthenticationPrincipal CustomUserDetails ja,
-                                                            @Valid @RequestBody PPIzvestajRequest req) {
+            @Valid @RequestBody PPIzvestajRequest req) {
         return ApiResponse.ok(ppService.kreirajIliAzuriraj(ja, req));
     }
 
     @PostMapping("/izvestaj/{id}/podnesi")
     @PreAuthorize("hasRole('NASTAVNIK')")
     public ApiResponse<PPIzvestajResponse> podnesi(@PathVariable UUID id,
-                                                    @AuthenticationPrincipal CustomUserDetails ja) {
+            @AuthenticationPrincipal CustomUserDetails ja) {
         return ApiResponse.ok(ppService.podnesi(id, ja));
     }
 
@@ -65,7 +66,7 @@ public class PPController {
     @GetMapping("/izvestaji/moji")
     @PreAuthorize("hasRole('NASTAVNIK')")
     public ApiResponse<List<PPIzvestajResponse>> mojiIzvestaji(@AuthenticationPrincipal CustomUserDetails ja,
-                                                                @RequestParam(required = false) String skolskaGodina) {
+            @RequestParam(required = false) String skolskaGodina) {
         return ApiResponse.ok(ppService.mojiIzvestaji(ja, skolskaGodina));
     }
 
@@ -84,6 +85,14 @@ public class PPController {
         return ApiResponse.ok(ppService.pregled(id));
     }
 
+    @DeleteMapping("/izvestaj/{id}")
+    @PreAuthorize("hasRole('KOORDINATOR')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Brise PP izvestaj (koordinator skole)")
+    public void obrisi(@PathVariable UUID id) {
+        ppService.obrisi(id);
+    }
+
     // -------- DASHBOARD I STATISTIKA --------
 
     @GetMapping("/dashboard")
@@ -97,7 +106,7 @@ public class PPController {
     @PreAuthorize("hasAnyRole('PP_SLUZBA','DIREKTOR')")
     @Operation(summary = "Sumirana statistika izvestaja za skolsku godinu i period")
     public ApiResponse<StatistikaResponse> statistika(@RequestParam String skolskaGodina,
-                                                       @RequestParam PPPeriod period) {
+            @RequestParam PPPeriod period) {
         return ApiResponse.ok(statistikaService.agregiraj(skolskaGodina, period));
     }
 

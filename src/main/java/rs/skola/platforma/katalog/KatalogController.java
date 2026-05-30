@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import rs.skola.platforma.common.web.ApiResponse;
@@ -74,6 +75,30 @@ public class KatalogController {
     public ApiResponse<IshodResponse> kreirajIshod(@RequestBody KreirajIshodRequest req) {
         var i = service.kreirajIshod(req.temaId(), req.opis());
         return ApiResponse.ok(new IshodResponse(i.getId(), req.temaId(), i.getOpis()));
+    }
+
+    @DeleteMapping("/teme/{id}")
+    @PreAuthorize("hasRole('KOORDINATOR')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Brise temu sa svim nastavnim jedinicama i ishodima (cascade)")
+    public void obrisiTemu(@PathVariable UUID id) {
+        service.obrisiTemu(id);
+    }
+
+    @DeleteMapping("/jedinice/{id}")
+    @PreAuthorize("hasRole('KOORDINATOR')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Brise nastavnu jedinicu — tema i ishodi te teme ostaju")
+    public void obrisiJedinicu(@PathVariable UUID id) {
+        service.obrisiJedinicu(id);
+    }
+
+    @DeleteMapping("/ishodi/{id}")
+    @PreAuthorize("hasRole('KOORDINATOR')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Brise ishod")
+    public void obrisiIshod(@PathVariable UUID id) {
+        service.obrisiIshod(id);
     }
 
     // -------- PADAJUCI MENIJI --------

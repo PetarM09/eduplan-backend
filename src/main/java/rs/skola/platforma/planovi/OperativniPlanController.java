@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -85,6 +86,14 @@ public class OperativniPlanController {
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<OperativniPlanResponse> pregled(@PathVariable UUID id) {
         return ApiResponse.ok(service.pregled(id));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('KOORDINATOR')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Brise operativni plan (koordinator skole)")
+    public void obrisi(@PathVariable UUID id) {
+        service.obrisi(id);
     }
 
     @GetMapping("/{id}/download/word")

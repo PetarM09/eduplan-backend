@@ -207,6 +207,17 @@ public class OperativniPlanService {
         return toResponse(plan);
     }
 
+    @Transactional
+    public void obrisi(UUID planId) {
+        UUID skolaId = TenantContext.require();
+        OperativniPlan plan = planRepo.findById(planId)
+                .orElseThrow(() -> new ResourceNotFoundException("Operativni plan", planId));
+        if (!skolaId.equals(plan.getSkolaId())) {
+            throw new TenantViolationException();
+        }
+        planRepo.delete(plan);
+    }
+
     // -------- helpers --------
 
     private OpStavka napraviStavku(OperativniPlan plan, KreirajOperativniPlanRequest.StavkaCasaRequest s,

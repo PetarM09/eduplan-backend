@@ -1,8 +1,10 @@
 package rs.skola.platforma.katalog;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import rs.skola.platforma.common.exception.ConflictException;
 import rs.skola.platforma.common.exception.ResourceNotFoundException;
 import rs.skola.platforma.common.exception.TenantViolationException;
 import rs.skola.platforma.common.tenant.TenantContext;
@@ -193,6 +195,36 @@ public class KatalogService {
             throw new TenantViolationException();
         }
         return i;
+    }
+
+    @Transactional
+    public void obrisiTemu(UUID temaId) {
+        Tema t = proveriTemu(temaId, TenantContext.require());
+        try {
+            temaRepo.delete(t);
+            temaRepo.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new ConflictException(
+                    "Tema je u upotrebi u godisnjem planu i ne moze se obrisati. " +
+                            "Prvo obrisi planove koji je koriste.");
+        }
+    }
+
+    @Transactional
+    public void obrisiJedinicu(UUID jedinicaId) {
+        UUID skolaId = TenantContext.require();
+        NastavnaJedinica j = jedinicaRepo.findById(jedinicaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Nastavna jedinica", jedinicaId));
+        if (!skolaId.equals(j.getSkolaId())) {
+            throw new TenantViolationException();
+        }
+        jedinicaRepo.delete(j);
+    }
+
+    @Transactional
+    public void obrisiIshod(UUID ishodId) {
+        Ishod i = nadjiIshod(ishodId);
+        ishodRepo.delete(i);
     }
 
     // -------- helpers --------
