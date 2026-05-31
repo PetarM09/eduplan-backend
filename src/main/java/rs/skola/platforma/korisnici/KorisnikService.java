@@ -1,6 +1,8 @@
 package rs.skola.platforma.korisnici;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +17,7 @@ import rs.skola.platforma.korisnici.repo.KorisnikRepository;
 import rs.skola.platforma.korisnici.web.KorisnikMapper;
 import rs.skola.platforma.korisnici.web.KorisnikResponse;
 import rs.skola.platforma.korisnici.web.KreirajKorisnikaRequest;
+import rs.skola.platforma.raspored.RasporedService;
 import rs.skola.platforma.tenant.domain.Skola;
 import rs.skola.platforma.tenant.repo.SkolaRepository;
 
@@ -22,13 +25,26 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class KorisnikService {
 
     private final KorisnikRepository korisnikRepository;
     private final SkolaRepository skolaRepository;
     private final KorisnikMapper mapper;
     private final PasswordEncoder passwordEncoder;
+    private final RasporedService rasporedService;
+
+    @Autowired
+    public KorisnikService(KorisnikRepository korisnikRepository,
+                           SkolaRepository skolaRepository,
+                           KorisnikMapper mapper,
+                           PasswordEncoder passwordEncoder,
+                           @Lazy RasporedService rasporedService) {
+        this.korisnikRepository = korisnikRepository;
+        this.skolaRepository = skolaRepository;
+        this.mapper = mapper;
+        this.passwordEncoder = passwordEncoder;
+        this.rasporedService = rasporedService;
+    }
 
     @Transactional(readOnly = true)
     public List<KorisnikResponse> sviKorisniciSkole() {
@@ -76,7 +92,11 @@ public class KorisnikService {
                 .uloga(req.uloga())
                 .aktivan(true)
                 .build();
-        return mapper.toResponse(korisnikRepository.save(k));
+        Korisnik sacuvan = korisnikRepository.save(k);
+        if (sacuvan.getUloga() == Uloga.NASTAVNIK || sacuvan.getUloga() == Uloga.KOORDINATOR) {
+            rasporedService.autoMapirajZaKorisnika(sacuvan);
+        }
+        return mapper.toResponse(sacuvan);
     }
 
     @Transactional

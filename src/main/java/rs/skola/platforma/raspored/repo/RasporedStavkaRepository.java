@@ -1,9 +1,11 @@
 package rs.skola.platforma.raspored.repo;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import rs.skola.platforma.korisnici.domain.Korisnik;
 import rs.skola.platforma.raspored.domain.RasporedStavka;
 
 import java.util.List;
@@ -76,4 +78,30 @@ public interface RasporedStavkaRepository extends JpaRepository<RasporedStavka, 
                                          @Param("odeljenjeId") UUID odeljenjeId);
 
     long countBySkolaIdAndVerzija_Id(UUID skolaId, UUID verzijaId);
+
+    @Query("""
+            SELECT rs.nastavnikLabel, COUNT(rs)
+            FROM RasporedStavka rs
+            WHERE rs.skolaId = :skolaId
+              AND rs.korisnik IS NULL
+            GROUP BY rs.nastavnikLabel
+            ORDER BY rs.nastavnikLabel ASC
+            """)
+    List<Object[]> nemapiraniSaCount(@Param("skolaId") UUID skolaId);
+
+    @Modifying
+    @Query("""
+            UPDATE RasporedStavka rs
+            SET rs.korisnik = :korisnik
+            WHERE rs.skolaId = :skolaId
+              AND rs.korisnik IS NULL
+              AND rs.nastavnikLabel = :label
+            """)
+    int mapirajPoLabelu(@Param("skolaId") UUID skolaId,
+                         @Param("label") String label,
+                         @Param("korisnik") Korisnik korisnik);
+
+    @Query("SELECT DISTINCT rs.nastavnikLabel FROM RasporedStavka rs " +
+            "WHERE rs.skolaId = :skolaId AND rs.korisnik IS NULL")
+    List<String> distinctNemapiraneLabels(@Param("skolaId") UUID skolaId);
 }

@@ -20,6 +20,7 @@ import rs.skola.platforma.raspored.parser.ParsedRasporedRed;
 import rs.skola.platforma.raspored.parser.XmlRasporedParser;
 import rs.skola.platforma.raspored.repo.RasporedStavkaRepository;
 import rs.skola.platforma.raspored.repo.VerzijaRasporedaRepository;
+import rs.skola.platforma.raspored.web.NemapiraniProfesorResponse;
 import rs.skola.platforma.raspored.web.RasporedStavkaResponse;
 import rs.skola.platforma.raspored.web.UvozRasporedaResponse;
 
@@ -108,7 +109,8 @@ public class RasporedService {
                 String[] delovi = s.odeljenjeLabel().split("/");
                 for (String deo : delovi) {
                     Odeljenje od = nadjiIliKreirajOdeljenje(indeksOdeljenja, skolaId, skolskaGodina, deo.trim());
-                    if (od == null) continue;
+                    if (od == null)
+                        continue;
                     kreiranihStavki += sacuvajStavku(verzija, nastavnik, red.nastavnikLabel(), od, s, skolaId) ? 1 : 0;
                 }
             }
@@ -123,12 +125,11 @@ public class RasporedService {
                 mapirano,
                 kreiranihStavki,
                 kreiranihOdeljenja,
-                nemapirani
-        );
+                nemapirani);
     }
 
     private boolean sacuvajStavku(VerzijaRasporeda verzija, Korisnik nastavnik, String nastavnikLabel,
-                                   Odeljenje od, ParsedRasporedRed.ParsedStavka s, UUID skolaId) {
+            Odeljenje od, ParsedRasporedRed.ParsedStavka s, UUID skolaId) {
         RasporedStavka stavka = RasporedStavka.builder()
                 .verzija(verzija)
                 .korisnik(nastavnik) // moze biti null kad korisnik nije u sistemu
@@ -164,8 +165,7 @@ public class RasporedService {
                         v.getDatumOd(),
                         v.isAktivan(),
                         stavkaRepo.countBySkolaIdAndVerzija_Id(skolaId, v.getId()),
-                        v.getCreatedAt()
-                ))
+                        v.getCreatedAt()))
                 .toList();
     }
 
@@ -207,14 +207,54 @@ public class RasporedService {
                 k != null ? k.punoIme() : rs.getNastavnikLabel(),
                 od == null ? null : od.getId(),
                 od == null ? null : od.label(),
-                rs.getPredmetLabel()
-        );
+                rs.getPredmetLabel());
+    }
+
+    @Transactional(readOnly = true)
+    public List<NemapiraniProfesorResponse> nemapiraniProfesori() {
+        UUID skolaId = TenantContext.require();
+        return stavkaRepo.nemapiraniSaCount(skolaId).stream()
+                .map(row -> new NemapiraniProfesorResponse(
+                        (String) row[0], ((Number) row[1]).longValue()))
+                .toList();
+    }
+
+    @Transactional
+    public int mapirajProfesora(String nastavnikLabel, UUID korisnikId) {
+        UUID skolaId = TenantContext.require();
+        Korisnik k = korisnikRepo.findById(korisnikId)
+                .orElseThrow(() -> new ResourceNotFoundException("Korisnik", korisnikId));
+        if (k.getSkola() == null || !skolaId.equals(k.getSkola().getId())) {
+            throw new ValidationException("Korisnik ne pripada vasoj skoli");
+        }
+        return stavkaRepo.mapirajPoLabelu(skolaId, nastavnikLabel, k);
+    }
+
+    /**
+     * Auto-mapira sve nemapirane stavke ciji label odgovara imenu novog korisnika.
+     */
+    @Transactional
+    public int autoMapirajZaKorisnika(Korisnik k) {
+        UUID skolaId = k.getSkola() == null ? null : k.getSkola().getId();
+        if (skolaId == null)
+            return 0;
+        java.util.Set<String> kljucevi = new java.util.HashSet<>(kljuceviKorisnika(k));
+        List<String> sveLabel = stavkaRepo.distinctNemapiraneLabels(skolaId);
+        int ukupno = 0;
+        for (String label : sveLabel) {
+            String norm = normalizujZaPoredjenje(label);
+            String norm2 = norm.replace(",", " ").replaceAll("\\s+", " ");
+            if (kljucevi.contains(norm) || kljucevi.contains(norm2)) {
+                ukupno += stavkaRepo.mapirajPoLabelu(skolaId, label, k);
+            }
+        }
+        return ukupno;
     }
 
     private Map<String, Korisnik> indeksKorisnikaSkole(UUID skolaId) {
         Map<String, Korisnik> mapa = new HashMap<>();
         // Koordinator je takodje nastavnik — moze imati raspored i drzati casove.
-        Uloga[] uloge = {Uloga.NASTAVNIK, Uloga.KOORDINATOR};
+        Uloga[] uloge = { Uloga.NASTAVNIK, Uloga.KOORDINATOR };
         for (Uloga u : uloge) {
             for (Korisnik k : korisnikRepo.findAllBySkolaIdAndUlogaOrderByPrezimeAscImeAsc(skolaId, u)) {
                 for (String klj : kljuceviKorisnika(k)) {
@@ -232,22 +272,24 @@ public class RasporedService {
                 (ime + " " + prez).trim(),
                 (prez + " " + ime).trim(),
                 (prez + ", " + ime).trim(),
-                normalizujZaPoredjenje(k.getUsername())
-        );
+                normalizujZaPoredjenje(k.getUsername()));
     }
 
     private Korisnik pronadjiKorisnika(Map<String, Korisnik> indeks, String labelaIzXml) {
-        if (labelaIzXml == null) return null;
+        if (labelaIzXml == null)
+            return null;
         String norm = normalizujZaPoredjenje(labelaIzXml);
         Korisnik direktan = indeks.get(norm);
-        if (direktan != null) return direktan;
+        if (direktan != null)
+            return direktan;
         // Pokusaj da svedemo na "ime prezime" — uklanjamo zarez i visestruke razmake
         String pokusaj = norm.replace(",", " ").replaceAll("\\s+", " ");
         return indeks.get(pokusaj);
     }
 
     private static String normalizujZaPoredjenje(String s) {
-        if (s == null) return "";
+        if (s == null)
+            return "";
         return s.toLowerCase().trim()
                 .replace("č", "c").replace("ć", "c")
                 .replace("š", "s").replace("ž", "z")
@@ -256,14 +298,15 @@ public class RasporedService {
 
     private Map<String, Odeljenje> indeksOdeljenjaSkole(UUID skolaId, String skolskaGodina) {
         Map<String, Odeljenje> mapa = new HashMap<>();
-        for (Odeljenje o : odeljenjeRepo.findAllBySkolaIdAndSkolskaGodinaOrderByRazredAscOznakaAsc(skolaId, skolskaGodina)) {
+        for (Odeljenje o : odeljenjeRepo.findAllBySkolaIdAndSkolskaGodinaOrderByRazredAscOznakaAsc(skolaId,
+                skolskaGodina)) {
             mapa.put(kljucOdeljenja(o.getRazred(), o.getOznaka()), o);
         }
         return mapa;
     }
 
     private Odeljenje nadjiIliKreirajOdeljenje(Map<String, Odeljenje> indeks, UUID skolaId,
-                                               String skolskaGodina, String labela) {
+            String skolskaGodina, String labela) {
         Matcher m = ODELJENJE.matcher(labela);
         if (!m.matches()) {
             log.debug("Nepoznata oznaka odeljenja: '{}'", labela);
@@ -274,7 +317,8 @@ public class RasporedService {
         String klj = kljucOdeljenja(razred, oznaka);
 
         Odeljenje postojece = indeks.get(klj);
-        if (postojece != null) return postojece;
+        if (postojece != null)
+            return postojece;
 
         Odeljenje novo = Odeljenje.builder()
                 .razred(razred)

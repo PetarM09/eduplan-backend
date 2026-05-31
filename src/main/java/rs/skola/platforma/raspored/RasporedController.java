@@ -12,9 +12,13 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import rs.skola.platforma.auth.security.CustomUserDetails;
 import rs.skola.platforma.common.web.ApiResponse;
+import rs.skola.platforma.raspored.web.NemapiraniProfesorResponse;
 import rs.skola.platforma.raspored.web.RasporedStavkaResponse;
 import rs.skola.platforma.raspored.web.UvozRasporedaResponse;
 import rs.skola.platforma.raspored.web.VerzijaResponse;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.List;
 import java.util.UUID;
@@ -69,4 +73,23 @@ public class RasporedController {
     public void obrisiVerziju(@PathVariable UUID id) {
         service.obrisiVerziju(id);
     }
+
+    @GetMapping("/nemapirani-profesori")
+    @PreAuthorize("hasRole('KOORDINATOR')")
+    @Operation(summary = "Lista profesora iz rasporeda koji nisu mapirani na korisnicki nalog")
+    public ApiResponse<List<NemapiraniProfesorResponse>> nemapirani() {
+        return ApiResponse.ok(service.nemapiraniProfesori());
+    }
+
+    @PostMapping("/mapiraj-profesora")
+    @PreAuthorize("hasRole('KOORDINATOR')")
+    @Operation(summary = "Manuelno mapira label iz rasporeda na postojeceg korisnika")
+    public ApiResponse<MapiranjeOdgovor> mapiraj(@Valid @RequestBody MapiranjeZahtev req) {
+        int azurirano = service.mapirajProfesora(req.nastavnikLabel(), req.korisnikId());
+        return ApiResponse.ok(new MapiranjeOdgovor(azurirano));
+    }
+
+    public record MapiranjeZahtev(@NotBlank String nastavnikLabel, @NotNull UUID korisnikId) {}
+
+    public record MapiranjeOdgovor(int brojAzuriranihStavki) {}
 }
