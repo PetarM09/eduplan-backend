@@ -16,7 +16,8 @@ public record KreirajRotacijuRequest(
 ) {
 
     public record PredmetStavka(
-            @NotNull UUID profesorId,
+            UUID profesorId,
+            @NotBlank @Size(max = 255) String profesorLabel,
             @NotBlank @Size(max = 255) String naziv,
             @NotNull @Min(1) @Max(20) Short casovaNedeljno
     ) {}

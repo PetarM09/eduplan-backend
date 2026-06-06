@@ -27,9 +27,12 @@ public class RotPredmet {
     @JoinColumn(name = "rotacija_id", nullable = false)
     private Rotacija rotacija;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "profesor_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "profesor_id")
     private Korisnik profesor;
+
+    @Column(name = "profesor_label", nullable = false, length = 255)
+    private String profesorLabel;
 
     @Column(nullable = false, length = 255)
     private String naziv;

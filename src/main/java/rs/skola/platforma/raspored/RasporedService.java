@@ -49,6 +49,8 @@ public class RasporedService {
     private final RasporedStavkaRepository stavkaRepo;
     private final OdeljenjeRepository odeljenjeRepo;
     private final KorisnikRepository korisnikRepo;
+    private final rs.skola.platforma.rotacija.repo.RotPredmetRepository rotPredmetRepo;
+    private final rs.skola.platforma.rotacija.repo.RotDodelaRepository rotDodelaRepo;
 
     @Transactional
     public UvozRasporedaResponse uvezi(MultipartFile file, String skolskaGodina, String naziv, boolean aktivan) {
@@ -227,7 +229,11 @@ public class RasporedService {
         if (k.getSkola() == null || !skolaId.equals(k.getSkola().getId())) {
             throw new ValidationException("Korisnik ne pripada vasoj skoli");
         }
-        return stavkaRepo.mapirajPoLabelu(skolaId, nastavnikLabel, k);
+        int azurirano = stavkaRepo.mapirajPoLabelu(skolaId, nastavnikLabel, k);
+        // Pri manuelnom mapiranju takodje povezi rotacija stavke za isti label
+        rotPredmetRepo.mapirajPoLabelu(skolaId, nastavnikLabel, k);
+        rotDodelaRepo.mapirajPoLabelu(skolaId, nastavnikLabel, k);
+        return azurirano;
     }
 
     /**
@@ -239,16 +245,30 @@ public class RasporedService {
         if (skolaId == null)
             return 0;
         java.util.Set<String> kljucevi = new java.util.HashSet<>(kljuceviKorisnika(k));
-        List<String> sveLabel = stavkaRepo.distinctNemapiraneLabels(skolaId);
+
+        // 1) Raspored stavke
         int ukupno = 0;
-        for (String label : sveLabel) {
-            String norm = normalizujZaPoredjenje(label);
-            String norm2 = norm.replace(",", " ").replaceAll("\\s+", " ");
-            if (kljucevi.contains(norm) || kljucevi.contains(norm2)) {
+        for (String label : stavkaRepo.distinctNemapiraneLabels(skolaId)) {
+            if (matchKey(label, kljucevi)) {
                 ukupno += stavkaRepo.mapirajPoLabelu(skolaId, label, k);
             }
         }
+
+        // 2) Rotacije — RotPredmet + RotDodela.
+        // Tek nakon ovog koraka, korisnik vidi rotaciju kroz `/rotacija/moje`.
+        for (String label : rotPredmetRepo.distinctNemapiraneLabels(skolaId)) {
+            if (matchKey(label, kljucevi)) {
+                rotPredmetRepo.mapirajPoLabelu(skolaId, label, k);
+                rotDodelaRepo.mapirajPoLabelu(skolaId, label, k);
+            }
+        }
         return ukupno;
+    }
+
+    private boolean matchKey(String label, java.util.Set<String> kljucevi) {
+        String norm = normalizujZaPoredjenje(label);
+        String norm2 = norm.replace(",", " ").replaceAll("\\s+", " ");
+        return kljucevi.contains(norm) || kljucevi.contains(norm2);
     }
 
     private Map<String, Korisnik> indeksKorisnikaSkole(UUID skolaId) {

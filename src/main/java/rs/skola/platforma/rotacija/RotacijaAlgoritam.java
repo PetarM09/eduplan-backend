@@ -17,7 +17,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 
 @Component
 public class RotacijaAlgoritam {
@@ -28,40 +27,39 @@ public class RotacijaAlgoritam {
         int g = r.getBrojGrupa();
         int n = r.getBrojNedelja();
 
-        // 1. Mapiranje profesor -> Korisnik (samo za ukljucene)
-        Map<UUID, Korisnik> profesoriMap = new HashMap<>();
+        // Skup labela ukljucenih profesora + mapa label -> Korisnik (null ako nije mapiran)
+        Set<String> ukljuceniLabeli = new HashSet<>();
+        Map<String, Korisnik> profesorPoLabelu = new HashMap<>();
         for (RotPredmet p : r.getPredmeti()) {
-            profesoriMap.put(p.getProfesor().getId(), p.getProfesor());
-        }
-
-        // 2. Predmeti po profesoru, sortirani po redniBroj
-        Map<UUID, List<RotPredmet>> predmetiPoProfesoru = new HashMap<>();
-        for (RotPredmet p : r.getPredmeti()) {
-            predmetiPoProfesoru
-                    .computeIfAbsent(p.getProfesor().getId(), k -> new ArrayList<>())
-                    .add(p);
-        }
-        predmetiPoProfesoru.values().forEach(lista -> lista.sort(Comparator.comparing(RotPredmet::getRedniBroj)));
-
-        // 3. Termini po profesoru — samo ukljuceni
-        Map<UUID, List<DetekcijaVezbiResponse.TerminVezbi>> terminePoProfesoru = new HashMap<>();
-        for (DetekcijaVezbiResponse.TerminVezbi t : detekcija.termini()) {
-            for (UUID profId : t.profesoriIds()) {
-                if (profId == null || !profesoriMap.containsKey(profId)) continue;
-                terminePoProfesoru.computeIfAbsent(profId, k -> new ArrayList<>()).add(t);
+            ukljuceniLabeli.add(p.getProfesorLabel());
+            if (p.getProfesor() != null) {
+                profesorPoLabelu.putIfAbsent(p.getProfesorLabel(), p.getProfesor());
             }
         }
-        terminePoProfesoru.values().forEach(lista ->
-                lista.sort(Comparator
-                        .comparing((DetekcijaVezbiResponse.TerminVezbi t) -> t.dan().ordinal())
-                        .thenComparing(DetekcijaVezbiResponse.TerminVezbi::cas)));
 
-        // 4. Validacija: brojGrupa >= max ukljucenih profesora u terminu
+        Map<String, List<RotPredmet>> predmetiPoLabelu = new HashMap<>();
+        for (RotPredmet p : r.getPredmeti()) {
+            predmetiPoLabelu.computeIfAbsent(p.getProfesorLabel(), k -> new ArrayList<>()).add(p);
+        }
+        predmetiPoLabelu.values().forEach(lista -> lista.sort(Comparator.comparing(RotPredmet::getRedniBroj)));
+
+        // Termini po profesoru — po labelu iz detekcije
+        Map<String, List<DetekcijaVezbiResponse.TerminVezbi>> terminePoLabelu = new HashMap<>();
+        for (DetekcijaVezbiResponse.TerminVezbi t : detekcija.termini()) {
+            for (String label : t.profesoriImena()) {
+                if (!ukljuceniLabeli.contains(label)) continue;
+                terminePoLabelu.computeIfAbsent(label, k -> new ArrayList<>()).add(t);
+            }
+        }
+        terminePoLabelu.values().forEach(lista -> lista.sort(Comparator
+                .comparing((DetekcijaVezbiResponse.TerminVezbi t) -> t.dan().ordinal())
+                .thenComparing(DetekcijaVezbiResponse.TerminVezbi::cas)));
+
         int maxProfesoraUTerminu = 0;
         for (DetekcijaVezbiResponse.TerminVezbi t : detekcija.termini()) {
             int ukljuceni = 0;
-            for (UUID profId : t.profesoriIds()) {
-                if (profId != null && profesoriMap.containsKey(profId)) ukljuceni++;
+            for (String label : t.profesoriImena()) {
+                if (ukljuceniLabeli.contains(label)) ukljuceni++;
             }
             maxProfesoraUTerminu = Math.max(maxProfesoraUTerminu, ukljuceni);
         }
@@ -73,37 +71,35 @@ public class RotacijaAlgoritam {
                             + "Povecaj broj grupa ili iskljuci nekog profesora.");
         }
 
-        // 5. Distribuiraj predmete po terminima (po profesoru, sekvencijalno)
-        Map<KljucTerminProfesor, RotPredmet> terminPredmet = new HashMap<>();
-        for (Map.Entry<UUID, List<DetekcijaVezbiResponse.TerminVezbi>> e : terminePoProfesoru.entrySet()) {
-            UUID profId = e.getKey();
+        Map<KljucTerminLabel, RotPredmet> terminPredmet = new HashMap<>();
+        for (Map.Entry<String, List<DetekcijaVezbiResponse.TerminVezbi>> e : terminePoLabelu.entrySet()) {
+            String label = e.getKey();
             List<DetekcijaVezbiResponse.TerminVezbi> termini = e.getValue();
-            List<RotPredmet> predmeti = predmetiPoProfesoru.getOrDefault(profId, List.of());
+            List<RotPredmet> predmeti = predmetiPoLabelu.getOrDefault(label, List.of());
             int idx = 0;
             for (RotPredmet pred : predmeti) {
                 for (int i = 0; i < pred.getCasovaNedeljno() && idx < termini.size(); i++, idx++) {
                     DetekcijaVezbiResponse.TerminVezbi t = termini.get(idx);
-                    terminPredmet.put(new KljucTerminProfesor(t.dan(), t.cas(), profId), pred);
+                    terminPredmet.put(new KljucTerminLabel(t.dan(), t.cas(), label), pred);
                 }
             }
         }
 
-        // 6. Raw blokovi = uzastopni casovi istog profesora, istog predmeta u istom danu
         Map<RawBlokKljuc, List<DetekcijaVezbiResponse.TerminVezbi>> rawBlokovi = new LinkedHashMap<>();
-        for (Map.Entry<UUID, List<DetekcijaVezbiResponse.TerminVezbi>> e : terminePoProfesoru.entrySet()) {
-            UUID profId = e.getKey();
+        for (Map.Entry<String, List<DetekcijaVezbiResponse.TerminVezbi>> e : terminePoLabelu.entrySet()) {
+            String label = e.getKey();
             List<DetekcijaVezbiResponse.TerminVezbi> termini = e.getValue();
             RawBlokKljuc trenutni = null;
             short ocekivaniCas = -1;
             for (DetekcijaVezbiResponse.TerminVezbi t : termini) {
-                RotPredmet pred = terminPredmet.get(new KljucTerminProfesor(t.dan(), t.cas(), profId));
+                RotPredmet pred = terminPredmet.get(new KljucTerminLabel(t.dan(), t.cas(), label));
                 if (pred == null) continue;
                 boolean nastavakBloka = trenutni != null
                         && trenutni.dan() == t.dan()
                         && trenutni.predmetNaziv().equals(pred.getNaziv())
                         && t.cas() == ocekivaniCas;
                 if (!nastavakBloka) {
-                    trenutni = new RawBlokKljuc(profId, pred.getNaziv(), t.dan(),
+                    trenutni = new RawBlokKljuc(label, pred.getNaziv(), t.dan(),
                             t.cas(), pred.getRedniBroj());
                 }
                 rawBlokovi.computeIfAbsent(trenutni, k -> new ArrayList<>()).add(t);
@@ -111,59 +107,50 @@ public class RotacijaAlgoritam {
             }
         }
 
-        // 7. Sece raw blokove na chunkove po TRAJANJE_BLOKA casova
         List<Chunk> sviChunkovi = new ArrayList<>();
         for (Map.Entry<RawBlokKljuc, List<DetekcijaVezbiResponse.TerminVezbi>> e : rawBlokovi.entrySet()) {
             RawBlokKljuc bk = e.getKey();
             List<DetekcijaVezbiResponse.TerminVezbi> termini = e.getValue();
-            Korisnik profesor = profesoriMap.get(bk.profesorId());
+            Korisnik profesor = profesorPoLabelu.get(bk.profesorLabel());
             for (int start = 0; start < termini.size(); start += TRAJANJE_BLOKA) {
                 int end = Math.min(start + TRAJANJE_BLOKA, termini.size());
-                sviChunkovi.add(new Chunk(bk.profesorId(), bk.predmetNaziv(), profesor,
+                sviChunkovi.add(new Chunk(bk.profesorLabel(), bk.predmetNaziv(), profesor,
                         new ArrayList<>(termini.subList(start, end))));
             }
         }
 
-        // 8. Sortiraj profesore stabilno (po imenu, pa po id-u) — offset razlikuje profesore
-        List<UUID> profIds = new ArrayList<>(profesoriMap.keySet());
-        profIds.sort((a, b) -> {
-            int cmp = profesoriMap.get(a).punoIme().compareTo(profesoriMap.get(b).punoIme());
-            if (cmp != 0) return cmp;
-            return a.compareTo(b);
-        });
-        Map<UUID, Integer> profOffset = new HashMap<>();
-        for (int i = 0; i < profIds.size(); i++) {
-            profOffset.put(profIds.get(i), i);
+        List<String> profLabeli = new ArrayList<>(ukljuceniLabeli);
+        profLabeli.sort(String::compareTo);
+        Map<String, Integer> profOffset = new HashMap<>();
+        for (int i = 0; i < profLabeli.size(); i++) {
+            profOffset.put(profLabeli.get(i), i);
         }
 
-        // 9. Grupisi chunkove po profesoru, sortiraj svaki po (dan, prvi cas)
-        Map<UUID, List<Chunk>> chunkoviPoProfesoru = new LinkedHashMap<>();
-        for (UUID profId : profIds) {
-            chunkoviPoProfesoru.put(profId, new ArrayList<>());
+        Map<String, List<Chunk>> chunkoviPoLabelu = new LinkedHashMap<>();
+        for (String label : profLabeli) {
+            chunkoviPoLabelu.put(label, new ArrayList<>());
         }
         for (Chunk c : sviChunkovi) {
-            chunkoviPoProfesoru.get(c.profesorId()).add(c);
+            chunkoviPoLabelu.get(c.profesorLabel()).add(c);
         }
-        for (List<Chunk> lista : chunkoviPoProfesoru.values()) {
+        for (List<Chunk> lista : chunkoviPoLabelu.values()) {
             lista.sort(Comparator
                     .comparing((Chunk c) -> c.termini().get(0).dan().ordinal())
                     .thenComparing(c -> c.termini().get(0).cas()));
         }
 
-        // 10. Generisi dodele — grupa = ((indeksUnutarProf + profOffset + (w−1)) mod G) + 1
         List<RotDodela> dodele = new ArrayList<>();
         for (short w = 1; w <= n; w++) {
             int weekShift = w - 1;
             Map<TerminKljuc, Set<Short>> grupeUTerminu = new HashMap<>();
 
-            for (UUID profId : profIds) {
-                int pOffset = profOffset.get(profId);
-                List<Chunk> profChunks = chunkoviPoProfesoru.get(profId);
+            for (String label : profLabeli) {
+                int pOffset = profOffset.get(label);
+                List<Chunk> profChunks = chunkoviPoLabelu.get(label);
                 for (int idx = 0; idx < profChunks.size(); idx++) {
                     Chunk c = profChunks.get(idx);
                     int grupa = ((idx + pOffset + weekShift) % g) + 1;
 
-                    // Konflikt: ako grupa vec postoji u BILO kom terminu ovog chunka
                     if (grupaKonfliktuje(c, grupa, grupeUTerminu)) {
                         for (int probaj = 1; probaj < g; probaj++) {
                             int alt = ((grupa - 1 + probaj) % g) + 1;
@@ -185,6 +172,7 @@ public class RotacijaAlgoritam {
                                 .dan(t.dan())
                                 .cas(t.cas())
                                 .profesor(c.profesor())
+                                .profesorLabel(c.profesorLabel())
                                 .predmetNaziv(c.predmetNaziv())
                                 .brojGrupe(finalGrupa)
                                 .build());
@@ -203,13 +191,13 @@ public class RotacijaAlgoritam {
         return false;
     }
 
-    private record KljucTerminProfesor(Dan dan, Short cas, UUID profesorId) {}
+    private record KljucTerminLabel(Dan dan, Short cas, String profesorLabel) {}
 
     private record TerminKljuc(Dan dan, Short cas) {}
 
-    private record RawBlokKljuc(UUID profesorId, String predmetNaziv, Dan dan,
+    private record RawBlokKljuc(String profesorLabel, String predmetNaziv, Dan dan,
                                  Short prviCas, Short redniBrojPredmeta) {}
 
-    private record Chunk(UUID profesorId, String predmetNaziv, Korisnik profesor,
+    private record Chunk(String profesorLabel, String predmetNaziv, Korisnik profesor,
                           List<DetekcijaVezbiResponse.TerminVezbi> termini) {}
 }

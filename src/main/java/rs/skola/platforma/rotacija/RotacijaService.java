@@ -70,7 +70,8 @@ public class RotacijaService {
         Map<TerminKljuc, Map<String, UUID>> poTerminu = new LinkedHashMap<>();
         for (RasporedStavka s : stavke) {
             String label = s.getNastavnikLabel();
-            if (label == null) continue;
+            if (label == null)
+                continue;
             UUID korisnikId = s.getKorisnik() == null ? null : s.getKorisnik().getId();
             Map<String, UUID> mapaTermina = poTerminu.computeIfAbsent(
                     new TerminKljuc(s.getDan(), s.getCas()), key -> new LinkedHashMap<>());
@@ -88,8 +89,8 @@ public class RotacijaService {
             Map<String, UUID> profesoriMap = e.getValue();
             List<String> imena = new ArrayList<>(profesoriMap.keySet());
             List<UUID> ids = imena.stream().map(profesoriMap::get).toList();
-            DetekcijaVezbiResponse.TerminVezbi termin =
-                    new DetekcijaVezbiResponse.TerminVezbi(e.getKey().dan, e.getKey().cas, ids, imena);
+            DetekcijaVezbiResponse.TerminVezbi termin = new DetekcijaVezbiResponse.TerminVezbi(e.getKey().dan,
+                    e.getKey().cas, ids, imena);
             sviTermini.add(termin);
 
             if (profesoriMap.size() >= 2) {
@@ -132,56 +133,30 @@ public class RotacijaService {
 
         DetekcijaVezbiResponse detekcija = detektujVezbe(req.odeljenjeId());
 
-        // Skup profesora koje je koordinator ukljucio u OVU rotaciju (unete predmete)
-        Map<UUID, Integer> unetiPoProfesoru = new HashMap<>();
+        // Validacija po LABELU — profesor moze biti i van sistema (auto-poveze se kasnije).
+        Map<String, Integer> unetiPoLabelu = new LinkedHashMap<>();
         for (KreirajRotacijuRequest.PredmetStavka st : req.predmeti()) {
-            unetiPoProfesoru.merge(st.profesorId(), st.casovaNedeljno().intValue(), Integer::sum);
+            unetiPoLabelu.merge(st.profesorLabel(), st.casovaNedeljno().intValue(), Integer::sum);
         }
 
-        // Detektovani profesori — samo oni koje je koordinator ukljucio se validiraju
-        Map<UUID, Integer> detektovaniPoProfesoru = new HashMap<>();
-        detekcija.profesori().stream()
-                .filter(p -> p.profesorId() != null)
-                .forEach(p -> detektovaniPoProfesoru.put(p.profesorId(), p.brojCasovaVezbi()));
+        Map<String, Integer> detektovaniPoLabelu = new HashMap<>();
+        detekcija.profesori().forEach(p -> detektovaniPoLabelu.put(p.profesorIme(), p.brojCasovaVezbi()));
 
-        // Provera: svi ukljuceni profesori moraju biti mapirani u sistem
-        // (jer RotPredmet.profesor je @NotNull Korisnik)
-        List<String> ukljuceniBezNaloga = detekcija.profesori().stream()
-                .filter(p -> p.profesorId() != null
-                        ? unetiPoProfesoru.containsKey(p.profesorId()) && !p.uSistemu()
-                        : false)
-                .map(DetekcijaVezbiResponse.ProfesorVezbi::profesorIme)
-                .toList();
-        if (!ukljuceniBezNaloga.isEmpty()) {
-            throw new ValidationException(
-                    "PROFESORI_VAN_SISTEMA",
-                    "Sledeci ukljuceni profesori nisu u sistemu kao korisnici: %s. "
-                            .formatted(String.join(", ", ukljuceniBezNaloga))
-                            + "Dodaj ih u Korisnici ili ih iskljuci iz rotacije.");
-        }
-
-        // Suma casova — samo za one koje je koordinator ukljucio
-        for (DetekcijaVezbiResponse.ProfesorVezbi p : detekcija.profesori()) {
-            if (p.profesorId() == null) continue; // bez naloga, korisnik ne moze ni da ukljuci
-            if (!unetiPoProfesoru.containsKey(p.profesorId())) continue; // iskljucen
-            int uneto = unetiPoProfesoru.get(p.profesorId());
-            if (uneto != p.brojCasovaVezbi()) {
+        for (Map.Entry<String, Integer> e : unetiPoLabelu.entrySet()) {
+            if (!detektovaniPoLabelu.containsKey(e.getKey())) {
+                throw new ValidationException(
+                        "Profesor %s nema casove vezbi u odeljenju".formatted(e.getKey()));
+            }
+            int detektovano = detektovaniPoLabelu.get(e.getKey());
+            if (e.getValue() != detektovano) {
                 throw new ValidationException(
                         "SUMA_CASOVA",
                         "Profesor %s ima %d casova vezbi u rasporedu, a unet je zbir %d"
-                                .formatted(p.profesorIme(), p.brojCasovaVezbi(), uneto));
+                                .formatted(e.getKey(), detektovano, e.getValue()));
             }
         }
 
-        for (UUID profesorId : unetiPoProfesoru.keySet()) {
-            if (!detektovaniPoProfesoru.containsKey(profesorId)) {
-                throw new ValidationException(
-                        "Profesor sa id %s nema casove vezbi u odeljenju".formatted(profesorId));
-            }
-        }
-
-        // Bar jedan profesor mora biti ukljucen
-        if (unetiPoProfesoru.isEmpty()) {
+        if (unetiPoLabelu.isEmpty()) {
             throw new ValidationException("Rotacija mora ukljuciti bar jednog profesora vezbi.");
         }
 
@@ -201,11 +176,13 @@ public class RotacijaService {
 
         short rb = 1;
         for (KreirajRotacijuRequest.PredmetStavka st : req.predmeti()) {
-            Korisnik profesor = korisnikRepo.findById(st.profesorId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Profesor", st.profesorId()));
+            Korisnik profesor = st.profesorId() == null
+                    ? null
+                    : korisnikRepo.findById(st.profesorId()).orElse(null);
             RotPredmet p = RotPredmet.builder()
                     .rotacija(r)
                     .profesor(profesor)
+                    .profesorLabel(st.profesorLabel())
                     .naziv(st.naziv())
                     .casovaNedeljno(st.casovaNedeljno())
                     .redniBroj(rb++)
@@ -262,8 +239,8 @@ public class RotacijaService {
                 .sorted(Comparator.comparing(RotPredmet::getRedniBroj))
                 .map(p -> new RotacijaResponse.PredmetResponse(
                         p.getId(),
-                        p.getProfesor().getId(),
-                        p.getProfesor().punoIme(),
+                        p.getProfesor() == null ? null : p.getProfesor().getId(),
+                        p.getProfesor() != null ? p.getProfesor().punoIme() : p.getProfesorLabel(),
                         p.getNaziv(),
                         p.getCasovaNedeljno(),
                         p.getRedniBroj()))
@@ -286,8 +263,8 @@ public class RotacijaService {
                     .map(d -> new RotacijaResponse.TerminDodela(
                             d.getDan(),
                             d.getCas(),
-                            d.getProfesor().getId(),
-                            d.getProfesor().punoIme(),
+                            d.getProfesor() == null ? null : d.getProfesor().getId(),
+                            d.getProfesor() != null ? d.getProfesor().punoIme() : d.getProfesorLabel(),
                             d.getPredmetNaziv(),
                             d.getBrojGrupe()))
                     .toList();
@@ -306,9 +283,9 @@ public class RotacijaService {
                 r.getSkolskaGodina(),
                 predmeti,
                 nedelje,
-                r.getCreatedAt()
-        );
+                r.getCreatedAt());
     }
 
-    private record TerminKljuc(Dan dan, Short cas) {}
+    private record TerminKljuc(Dan dan, Short cas) {
+    }
 }

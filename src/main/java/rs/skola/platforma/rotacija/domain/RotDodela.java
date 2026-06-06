@@ -38,9 +38,12 @@ public class RotDodela {
     @Column(nullable = false)
     private Short cas;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "profesor_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "profesor_id")
     private Korisnik profesor;
+
+    @Column(name = "profesor_label", nullable = false, length = 255)
+    private String profesorLabel;
 
     @Column(name = "predmet_naziv", nullable = false, length = 255)
     private String predmetNaziv;
