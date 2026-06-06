@@ -169,6 +169,7 @@ public class RasporedService {
                         v.getDatumOd(),
                         v.isAktivan(),
                         stavkaRepo.countBySkolaIdAndVerzija_Id(skolaId, v.getId()),
+                        stavkaRepo.brojProfesoraPoVerziji(skolaId, v.getId()),
                         v.getCreatedAt()))
                 .toList();
     }
@@ -185,7 +186,10 @@ public class RasporedService {
         v.setAktivan(true);
         return new rs.skola.platforma.raspored.web.VerzijaResponse(
                 v.getId(), v.getNaziv(), v.getSkolskaGodina(), v.getDatumOd(),
-                true, stavkaRepo.countBySkolaIdAndVerzija_Id(skolaId, v.getId()), v.getCreatedAt());
+                true,
+                stavkaRepo.countBySkolaIdAndVerzija_Id(skolaId, v.getId()),
+                stavkaRepo.brojProfesoraPoVerziji(skolaId, v.getId()),
+                v.getCreatedAt());
     }
 
     @Transactional

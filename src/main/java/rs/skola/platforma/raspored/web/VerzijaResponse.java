@@ -11,5 +11,6 @@ public record VerzijaResponse(
         LocalDate datumOd,
         boolean aktivan,
         long brojStavki,
+        long brojProfesora,
         OffsetDateTime createdAt
 ) {}

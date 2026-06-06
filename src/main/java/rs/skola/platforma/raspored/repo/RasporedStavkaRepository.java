@@ -80,6 +80,12 @@ public interface RasporedStavkaRepository extends JpaRepository<RasporedStavka, 
     long countBySkolaIdAndVerzija_Id(UUID skolaId, UUID verzijaId);
 
     @Query("""
+            SELECT COUNT(DISTINCT rs.nastavnikLabel) FROM RasporedStavka rs
+            WHERE rs.skolaId = :skolaId AND rs.verzija.id = :verzijaId
+            """)
+    long brojProfesoraPoVerziji(@Param("skolaId") UUID skolaId, @Param("verzijaId") UUID verzijaId);
+
+    @Query("""
             SELECT rs.nastavnikLabel, COUNT(rs)
             FROM RasporedStavka rs
             WHERE rs.skolaId = :skolaId
