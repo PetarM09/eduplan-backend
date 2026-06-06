@@ -14,6 +14,7 @@ import rs.skola.platforma.predmeti.domain.Predmet;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -64,6 +65,21 @@ public class OperativniPlan extends TenantAwareEntity {
 
     @Column(name = "podnet_at")
     private OffsetDateTime podnetAt;
+
+    @Column(name = "razlog_vracanja", columnDefinition = "TEXT")
+    private String razlogVracanja;
+
+    @Column(name = "odobren_at")
+    private OffsetDateTime odobrenAt;
+
+    @Column(name = "odobrio_id")
+    private UUID odobrioId;
+
+    @Column(name = "vracen_at")
+    private OffsetDateTime vracenAt;
+
+    @Column(name = "vratio_id")
+    private UUID vratioId;
 
     @OneToMany(mappedBy = "operativniPlan", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("redniBrojCasa ASC")

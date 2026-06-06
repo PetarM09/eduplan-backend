@@ -84,6 +84,21 @@ public class GodisnjiPlan extends TenantAwareEntity {
     @Column(name = "podnet_at")
     private OffsetDateTime podnetAt;
 
+    @Column(name = "razlog_vracanja", columnDefinition = "TEXT")
+    private String razlogVracanja;
+
+    @Column(name = "odobren_at")
+    private OffsetDateTime odobrenAt;
+
+    @Column(name = "odobrio_id")
+    private UUID odobrioId;
+
+    @Column(name = "vracen_at")
+    private OffsetDateTime vracenAt;
+
+    @Column(name = "vratio_id")
+    private UUID vratioId;
+
     @OneToMany(mappedBy = "godisnjiPlan", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<GodisnjiPlanTema> teme = new ArrayList<>();

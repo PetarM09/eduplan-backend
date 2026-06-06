@@ -20,11 +20,14 @@ import rs.skola.platforma.korisnici.repo.KorisnikRepository;
 import rs.skola.platforma.planovi.domain.GodisnjiPlan;
 import rs.skola.platforma.planovi.domain.GodisnjiPlanTema;
 import rs.skola.platforma.planovi.domain.PlanStatus;
+import rs.skola.platforma.planovi.mail.PlanMailService;
 import rs.skola.platforma.planovi.repo.GodisnjiPlanRepository;
 import rs.skola.platforma.planovi.web.GodisnjiPlanResponse;
 import rs.skola.platforma.planovi.web.KreirajGodisnjiPlanRequest;
 import rs.skola.platforma.predmeti.domain.Predmet;
 import rs.skola.platforma.predmeti.repo.PredmetRepository;
+import rs.skola.platforma.tenant.domain.Skola;
+import rs.skola.platforma.tenant.repo.SkolaRepository;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -45,8 +48,10 @@ public class GodisnjiPlanService {
     private final GodisnjiPlanRepository planRepo;
     private final KorisnikRepository korisnikRepo;
     private final PredmetRepository predmetRepo;
+    private final SkolaRepository skolaRepo;
     private final KatalogService katalogService;
     private final PlanIsporukaService isporukaService;
+    private final PlanMailService mailService;
 
     @Transactional
     public GodisnjiPlanResponse kreirajIliAzuriraj(CustomUserDetails ja, KreirajGodisnjiPlanRequest req) {
@@ -127,7 +132,62 @@ public class GodisnjiPlanService {
         }
         plan.setStatus(PlanStatus.PODNET);
         plan.setPodnetAt(OffsetDateTime.now());
+        plan.setRazlogVracanja(null);
         return toResponse(plan);
+    }
+
+    @Transactional
+    public GodisnjiPlanResponse odobri(UUID planId, CustomUserDetails ja) {
+        UUID skolaId = TenantContext.require();
+        GodisnjiPlan plan = nadji(planId, skolaId);
+        if (plan.getStatus() != PlanStatus.PODNET) {
+            throw new ConflictException("Moze se odobriti samo plan u statusu PODNET");
+        }
+        plan.setStatus(PlanStatus.ARHIVIRAN);
+        plan.setOdobrenAt(OffsetDateTime.now());
+        plan.setOdobrioId(ja.id());
+        return toResponse(plan);
+    }
+
+    @Transactional
+    public GodisnjiPlanResponse odbij(UUID planId, String razlog, CustomUserDetails ja) {
+        UUID skolaId = TenantContext.require();
+        GodisnjiPlan plan = nadji(planId, skolaId);
+        if (plan.getStatus() != PlanStatus.PODNET) {
+            throw new ConflictException("Moze se vratiti na doradu samo plan u statusu PODNET");
+        }
+        if (razlog == null || razlog.isBlank()) {
+            throw new ValidationException("Razlog vracanja je obavezan");
+        }
+        plan.setStatus(PlanStatus.VRACENO_NA_DORADU);
+        plan.setRazlogVracanja(razlog);
+        plan.setVracenAt(OffsetDateTime.now());
+        plan.setVratioId(ja.id());
+        GodisnjiPlan finalPlan = plan;
+        String razlogKopija = razlog;
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                posaljiObavestenjeOdbijanja(finalPlan, razlogKopija);
+            }
+        });
+        return toResponse(plan);
+    }
+
+    private void posaljiObavestenjeOdbijanja(GodisnjiPlan plan, String razlog) {
+        try {
+            String primalac = plan.getNastavnik().getEmail();
+            if (primalac == null || primalac.isBlank()) {
+                log.warn("Nastavnik {} nema email — preskacem obavestenje o odbijanju plana {}",
+                        plan.getNastavnik().getId(), plan.getId());
+                return;
+            }
+            Skola skola = skolaRepo.findById(plan.getSkolaId()).orElse(null);
+            mailService.posaljiOdbijanjeGodisnjeg(plan, skola, razlog, primalac);
+        } catch (Exception ex) {
+            log.error("Greska pri slanju obavestenja o odbijanju godisnjeg plana {}: {}",
+                    plan.getId(), ex.getMessage(), ex);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -267,6 +327,9 @@ public class GodisnjiPlanService {
                 p.getNapomene(),
                 p.getStatus(),
                 p.getPodnetAt(),
+                p.getRazlogVracanja(),
+                p.getOdobrenAt(),
+                p.getVracenAt(),
                 p.getWordFajlPutanja() != null,
                 p.getPdfFajlPutanja() != null,
                 teme,

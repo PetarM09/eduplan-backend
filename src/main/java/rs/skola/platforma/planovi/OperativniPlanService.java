@@ -26,11 +26,14 @@ import rs.skola.platforma.planovi.domain.OpStavka;
 import rs.skola.platforma.planovi.domain.OpStavkaMedjupredmetno;
 import rs.skola.platforma.planovi.domain.OperativniPlan;
 import rs.skola.platforma.planovi.domain.PlanStatus;
+import rs.skola.platforma.planovi.mail.PlanMailService;
 import rs.skola.platforma.planovi.repo.OperativniPlanRepository;
 import rs.skola.platforma.planovi.web.KreirajOperativniPlanRequest;
 import rs.skola.platforma.planovi.web.OperativniPlanResponse;
 import rs.skola.platforma.predmeti.domain.Predmet;
 import rs.skola.platforma.predmeti.repo.PredmetRepository;
+import rs.skola.platforma.tenant.domain.Skola;
+import rs.skola.platforma.tenant.repo.SkolaRepository;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -48,8 +51,10 @@ public class OperativniPlanService {
     private final KorisnikRepository korisnikRepo;
     private final PredmetRepository predmetRepo;
     private final OdeljenjeRepository odeljenjeRepo;
+    private final SkolaRepository skolaRepo;
     private final KatalogService katalogService;
     private final OperativniPlanIsporukaService isporukaService;
+    private final PlanMailService mailService;
 
     @Transactional
     public OperativniPlanResponse kreirajIliAzuriraj(CustomUserDetails ja, KreirajOperativniPlanRequest req) {
@@ -123,7 +128,62 @@ public class OperativniPlanService {
         }
         plan.setStatus(PlanStatus.PODNET);
         plan.setPodnetAt(OffsetDateTime.now());
+        plan.setRazlogVracanja(null);
         return toResponse(plan);
+    }
+
+    @Transactional
+    public OperativniPlanResponse odobri(UUID planId, CustomUserDetails ja) {
+        UUID skolaId = TenantContext.require();
+        OperativniPlan plan = nadji(planId, skolaId);
+        if (plan.getStatus() != PlanStatus.PODNET) {
+            throw new ConflictException("Moze se odobriti samo plan u statusu PODNET");
+        }
+        plan.setStatus(PlanStatus.ARHIVIRAN);
+        plan.setOdobrenAt(OffsetDateTime.now());
+        plan.setOdobrioId(ja.id());
+        return toResponse(plan);
+    }
+
+    @Transactional
+    public OperativniPlanResponse odbij(UUID planId, String razlog, CustomUserDetails ja) {
+        UUID skolaId = TenantContext.require();
+        OperativniPlan plan = nadji(planId, skolaId);
+        if (plan.getStatus() != PlanStatus.PODNET) {
+            throw new ConflictException("Moze se vratiti na doradu samo plan u statusu PODNET");
+        }
+        if (razlog == null || razlog.isBlank()) {
+            throw new ValidationException("Razlog vracanja je obavezan");
+        }
+        plan.setStatus(PlanStatus.VRACENO_NA_DORADU);
+        plan.setRazlogVracanja(razlog);
+        plan.setVracenAt(OffsetDateTime.now());
+        plan.setVratioId(ja.id());
+        OperativniPlan finalPlan = plan;
+        String razlogKopija = razlog;
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                posaljiObavestenjeOdbijanja(finalPlan, razlogKopija);
+            }
+        });
+        return toResponse(plan);
+    }
+
+    private void posaljiObavestenjeOdbijanja(OperativniPlan plan, String razlog) {
+        try {
+            String primalac = plan.getNastavnik().getEmail();
+            if (primalac == null || primalac.isBlank()) {
+                log.warn("Nastavnik {} nema email — preskacem obavestenje o odbijanju plana {}",
+                        plan.getNastavnik().getId(), plan.getId());
+                return;
+            }
+            Skola skola = skolaRepo.findById(plan.getSkolaId()).orElse(null);
+            mailService.posaljiOdbijanjeOperativnog(plan, skola, razlog, primalac);
+        } catch (Exception ex) {
+            log.error("Greska pri slanju obavestenja o odbijanju operativnog plana {}: {}",
+                    plan.getId(), ex.getMessage(), ex);
+        }
     }
 
     @Transactional
@@ -367,6 +427,9 @@ public class OperativniPlanService {
                 p.getNapomene(),
                 p.getStatus(),
                 p.getPodnetAt(),
+                p.getRazlogVracanja(),
+                p.getOdobrenAt(),
+                p.getVracenAt(),
                 p.getWordFajlPutanja() != null,
                 p.getPdfFajlPutanja() != null,
                 stavke,

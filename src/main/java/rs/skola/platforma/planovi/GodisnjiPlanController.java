@@ -63,6 +63,25 @@ public class GodisnjiPlanController {
         return ApiResponse.ok(service.podnesi(id, ja));
     }
 
+    @PostMapping("/{id}/odobri")
+    @PreAuthorize("hasAnyRole('PP_SLUZBA','KOORDINATOR')")
+    @Operation(summary = "PP sluzba odobrava plan — status prelazi u ARHIVIRAN")
+    public ApiResponse<GodisnjiPlanResponse> odobri(@PathVariable UUID id,
+                                                     @AuthenticationPrincipal CustomUserDetails ja) {
+        return ApiResponse.ok(service.odobri(id, ja));
+    }
+
+    @PostMapping("/{id}/odbij")
+    @PreAuthorize("hasAnyRole('PP_SLUZBA','KOORDINATOR')")
+    @Operation(summary = "PP sluzba vraca plan na doradu — status prelazi u VRACENO_NA_DORADU; salje se mail nastavniku")
+    public ApiResponse<GodisnjiPlanResponse> odbij(@PathVariable UUID id,
+                                                     @RequestBody OdbijRequest req,
+                                                     @AuthenticationPrincipal CustomUserDetails ja) {
+        return ApiResponse.ok(service.odbij(id, req.razlog(), ja));
+    }
+
+    public record OdbijRequest(String razlog) {}
+
     @GetMapping("/me")
     @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
     @Operation(summary = "Moji godisnji planovi")

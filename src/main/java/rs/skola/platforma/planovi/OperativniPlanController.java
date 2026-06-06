@@ -52,6 +52,25 @@ public class OperativniPlanController {
         return ApiResponse.ok(service.podnesi(id, ja));
     }
 
+    @PostMapping("/{id}/odobri")
+    @PreAuthorize("hasAnyRole('PP_SLUZBA','KOORDINATOR')")
+    @Operation(summary = "PP sluzba odobrava plan — status prelazi u ARHIVIRAN")
+    public ApiResponse<OperativniPlanResponse> odobri(@PathVariable UUID id,
+                                                       @AuthenticationPrincipal CustomUserDetails ja) {
+        return ApiResponse.ok(service.odobri(id, ja));
+    }
+
+    @PostMapping("/{id}/odbij")
+    @PreAuthorize("hasAnyRole('PP_SLUZBA','KOORDINATOR')")
+    @Operation(summary = "PP sluzba vraca plan na doradu — status prelazi u VRACENO_NA_DORADU; salje se mail nastavniku")
+    public ApiResponse<OperativniPlanResponse> odbij(@PathVariable UUID id,
+                                                      @RequestBody OdbijRequest req,
+                                                      @AuthenticationPrincipal CustomUserDetails ja) {
+        return ApiResponse.ok(service.odbij(id, req.razlog(), ja));
+    }
+
+    public record OdbijRequest(String razlog) {}
+
     @PostMapping("/{id}/kloniraj")
     @PreAuthorize("hasAnyRole('NASTAVNIK','KOORDINATOR')")
     @Operation(summary = "Klonira plan u drugu skolsku godinu (zadrzava sve stavke, briše evaluaciju)")

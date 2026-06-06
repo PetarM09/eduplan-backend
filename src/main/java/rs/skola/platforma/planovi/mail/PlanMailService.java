@@ -67,6 +67,89 @@ public class PlanMailService {
         }
     }
 
+    public void posaljiOdbijanjeGodisnjeg(GodisnjiPlan plan, Skola skola, String razlog, String primalac) {
+        String subject = "Godisnji plan vracen na doradu — " + plan.getPredmet().getNaziv()
+                + " (" + plan.getSkolskaGodina() + ")";
+        try {
+            MimeMessage msg = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(msg, false, "UTF-8");
+            postaviFrom(helper);
+            if (replyTo != null) helper.setReplyTo(replyTo);
+            helper.setTo(primalac);
+            helper.setSubject(subject);
+            helper.setText(teloOdbijanjaGodisnjeg(plan, skola, razlog), false);
+            mailSender.send(msg);
+            log.info("Poslat mail o odbijanju godisnjeg plana {} primaocu {}", plan.getId(), primalac);
+        } catch (Exception ex) {
+            log.error("Greska pri slanju mail-a o odbijanju godisnjeg plana {}: {}",
+                    plan.getId(), ex.getMessage(), ex);
+        }
+    }
+
+    public void posaljiOdbijanjeOperativnog(OperativniPlan plan, Skola skola, String razlog, String primalac) {
+        String subject = "Operativni plan vracen na doradu — " + plan.getPredmet().getNaziv()
+                + " — " + plan.getOdeljenje().label()
+                + " (" + nazivMeseca(plan.getMesec()) + " " + plan.getSkolskaGodina() + ")";
+        try {
+            MimeMessage msg = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(msg, false, "UTF-8");
+            postaviFrom(helper);
+            if (replyTo != null) helper.setReplyTo(replyTo);
+            helper.setTo(primalac);
+            helper.setSubject(subject);
+            helper.setText(teloOdbijanjaOperativnog(plan, skola, razlog), false);
+            mailSender.send(msg);
+            log.info("Poslat mail o odbijanju operativnog plana {} primaocu {}", plan.getId(), primalac);
+        } catch (Exception ex) {
+            log.error("Greska pri slanju mail-a o odbijanju operativnog plana {}: {}",
+                    plan.getId(), ex.getMessage(), ex);
+        }
+    }
+
+    private String teloOdbijanjaGodisnjeg(GodisnjiPlan plan, Skola skola, String razlog) {
+        return """
+                Postovani,
+
+                Vas godisnji plan rada je vracen na doradu od strane PP sluzbe:
+                  Predmet:          %s
+                  Razred:           %s
+                  Skolska godina:   %s
+                %s
+                Razlog vracanja:
+                %s
+
+                Molimo Vas da uradite potrebne izmene i ponovo podnesete plan kroz skolsku platformu.
+                """.formatted(
+                plan.getPredmet().getNaziv(),
+                plan.getRazred() == null ? "-" : plan.getRazred(),
+                plan.getSkolskaGodina(),
+                skola == null ? "" : "  Skola:            " + skola.getNaziv() + "\n",
+                razlog == null || razlog.isBlank() ? "(nije naveden)" : razlog);
+    }
+
+    private String teloOdbijanjaOperativnog(OperativniPlan plan, Skola skola, String razlog) {
+        return """
+                Postovani,
+
+                Vas operativni plan rada je vracen na doradu od strane PP sluzbe:
+                  Predmet:          %s
+                  Odeljenje:        %s
+                  Mesec:            %s
+                  Skolska godina:   %s
+                %s
+                Razlog vracanja:
+                %s
+
+                Molimo Vas da uradite potrebne izmene i ponovo podnesete plan kroz skolsku platformu.
+                """.formatted(
+                plan.getPredmet().getNaziv(),
+                plan.getOdeljenje().label(),
+                nazivMeseca(plan.getMesec()),
+                plan.getSkolskaGodina(),
+                skola == null ? "" : "  Skola:            " + skola.getNaziv() + "\n",
+                razlog == null || razlog.isBlank() ? "(nije naveden)" : razlog);
+    }
+
     public void posaljiOperativniPlan(OperativniPlan plan, Skola skola, byte[] wordBytes, String primalac) {
         String subject = "Operativni plan — " + plan.getNastavnik().punoIme()
                 + " — " + plan.getPredmet().getNaziv()
