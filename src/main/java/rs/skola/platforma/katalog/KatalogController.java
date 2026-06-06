@@ -117,8 +117,40 @@ public class KatalogController {
         return ApiResponse.ok(service.metodeRada());
     }
 
+    @PostMapping("/tipovi-casa")
+    @PreAuthorize("hasAnyRole('KOORDINATOR','PP_SLUZBA')")
+    @Operation(summary = "Dodaje skolski tip casa")
+    public ApiResponse<PadajuciMeniResponse> kreirajTipCasa(@RequestBody KreirajPadajuciRequest req) {
+        return ApiResponse.ok(service.kreirajTipCasa(req.naziv()));
+    }
+
+    @DeleteMapping("/tipovi-casa/{id}")
+    @PreAuthorize("hasAnyRole('KOORDINATOR','PP_SLUZBA')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Brise skolski tip casa (sistemski se ne moze)")
+    public void obrisiTipCasa(@PathVariable UUID id) {
+        service.obrisiTipCasa(id);
+    }
+
+    @PostMapping("/metode-rada")
+    @PreAuthorize("hasAnyRole('KOORDINATOR','PP_SLUZBA')")
+    @Operation(summary = "Dodaje skolsku metodu rada")
+    public ApiResponse<PadajuciMeniResponse> kreirajMetoduRada(@RequestBody KreirajPadajuciRequest req) {
+        return ApiResponse.ok(service.kreirajMetoduRada(req.naziv()));
+    }
+
+    @DeleteMapping("/metode-rada/{id}")
+    @PreAuthorize("hasAnyRole('KOORDINATOR','PP_SLUZBA')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Brise skolsku metodu rada (sistemska se ne moze)")
+    public void obrisiMetoduRada(@PathVariable UUID id) {
+        service.obrisiMetoduRada(id);
+    }
+
     public record KreirajIshodRequest(
             @NotNull UUID temaId,
             @NotBlank @Size(max = 2000) String opis
     ) {}
+
+    public record KreirajPadajuciRequest(@NotBlank @Size(max = 100) String naziv) {}
 }

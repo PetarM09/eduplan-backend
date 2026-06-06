@@ -38,6 +38,7 @@ public class KatalogService {
     private final TipCasaRepository tipCasaRepo;
     private final MetodaRadaRepository metodaRepo;
     private final PredmetRepository predmetRepo;
+    private final rs.skola.platforma.tenant.repo.SkolaRepository skolaRepo;
 
     // -------- TEME --------
 
@@ -161,6 +162,64 @@ public class KatalogService {
         return metodaRepo.dostupneZaSkolu(skolaId).stream()
                 .map(m -> new PadajuciMeniResponse(m.getId(), m.getNaziv(), m.jeSistemska()))
                 .toList();
+    }
+
+    @Transactional
+    public PadajuciMeniResponse kreirajTipCasa(String naziv) {
+        UUID skolaId = TenantContext.require();
+        String trim = naziv == null ? "" : naziv.trim();
+        if (trim.isEmpty() || trim.length() > 100) {
+            throw new ValidationException("Naziv tipa casa mora biti 1-100 karaktera");
+        }
+        rs.skola.platforma.tenant.domain.Skola skola = skolaRepo.findById(skolaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Skola", skolaId));
+        TipCasa t = TipCasa.builder().skola(skola).naziv(trim).aktivan(true).build();
+        t = tipCasaRepo.save(t);
+        return new PadajuciMeniResponse(t.getId(), t.getNaziv(), t.jeSistemski());
+    }
+
+    @Transactional
+    public PadajuciMeniResponse kreirajMetoduRada(String naziv) {
+        UUID skolaId = TenantContext.require();
+        String trim = naziv == null ? "" : naziv.trim();
+        if (trim.isEmpty() || trim.length() > 100) {
+            throw new ValidationException("Naziv metode rada mora biti 1-100 karaktera");
+        }
+        rs.skola.platforma.tenant.domain.Skola skola = skolaRepo.findById(skolaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Skola", skolaId));
+        MetodaRada m = MetodaRada.builder().skola(skola).naziv(trim).aktivan(true).build();
+        m = metodaRepo.save(m);
+        return new PadajuciMeniResponse(m.getId(), m.getNaziv(), m.jeSistemska());
+    }
+
+    @Transactional
+    public void obrisiTipCasa(UUID id) {
+        TipCasa t = nadjiTipCasa(id);
+        if (t.jeSistemski()) {
+            throw new ConflictException("Sistemski tipovi casa se ne mogu obrisati");
+        }
+        try {
+            tipCasaRepo.delete(t);
+            tipCasaRepo.flush();
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            throw new ConflictException(
+                    "Tip casa je u upotrebi u operativnim planovima i ne moze se obrisati.");
+        }
+    }
+
+    @Transactional
+    public void obrisiMetoduRada(UUID id) {
+        MetodaRada m = nadjiMetodu(id);
+        if (m.jeSistemska()) {
+            throw new ConflictException("Sistemske metode rada se ne mogu obrisati");
+        }
+        try {
+            metodaRepo.delete(m);
+            metodaRepo.flush();
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            throw new ConflictException(
+                    "Metoda rada je u upotrebi u operativnim planovima i ne moze se obrisati.");
+        }
     }
 
     public TipCasa nadjiTipCasa(UUID id) {
