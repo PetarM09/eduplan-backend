@@ -23,6 +23,8 @@ import rs.skola.platforma.raspored.repo.VerzijaRasporedaRepository;
 import rs.skola.platforma.raspored.web.NemapiraniProfesorResponse;
 import rs.skola.platforma.raspored.web.RasporedStavkaResponse;
 import rs.skola.platforma.raspored.web.UvozRasporedaResponse;
+import rs.skola.platforma.rotacija.repo.RotDodelaRepository;
+import rs.skola.platforma.rotacija.repo.RotPredmetRepository;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -49,8 +51,8 @@ public class RasporedService {
     private final RasporedStavkaRepository stavkaRepo;
     private final OdeljenjeRepository odeljenjeRepo;
     private final KorisnikRepository korisnikRepo;
-    private final rs.skola.platforma.rotacija.repo.RotPredmetRepository rotPredmetRepo;
-    private final rs.skola.platforma.rotacija.repo.RotDodelaRepository rotDodelaRepo;
+    private final RotPredmetRepository rotPredmetRepo;
+    private final RotDodelaRepository rotDodelaRepo;
 
     @Transactional
     public UvozRasporedaResponse uvezi(MultipartFile file, String skolskaGodina, String naziv, boolean aktivan) {
