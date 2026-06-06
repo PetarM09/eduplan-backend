@@ -40,7 +40,7 @@ public class PlanMailService {
         this.replyTo = (mailReplyTo == null || mailReplyTo.isBlank()) ? null : mailReplyTo.trim();
     }
 
-    public void posaljiGodisnjiPlan(GodisnjiPlan plan, Skola skola, byte[] wordBytes, String primalac) {
+    public void posaljiGodisnjiPlan(GodisnjiPlan plan, Skola skola, byte[] wordBytes, byte[] pdfBytes, String primalac) {
         String subject = "Godisnji plan rada — " + plan.getNastavnik().punoIme()
                 + " — " + plan.getPredmet().getNaziv() + " (" + plan.getSkolskaGodina() + ")";
         try {
@@ -52,11 +52,16 @@ public class PlanMailService {
             helper.setSubject(subject);
             helper.setText(telo(plan, skola), false);
 
-            String fileName = "GodisnjiPlan_%s_%s.docx".formatted(
+            String baseName = "GodisnjiPlan_%s_%s".formatted(
                     plan.getPredmet().getNaziv().replaceAll("\\s+", "_"),
                     plan.getSkolskaGodina().replace("/", "-"));
-            helper.addAttachment(fileName, new ByteArrayDataSource(wordBytes,
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
+            if (wordBytes != null) {
+                helper.addAttachment(baseName + ".docx", new ByteArrayDataSource(wordBytes,
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
+            }
+            if (pdfBytes != null) {
+                helper.addAttachment(baseName + ".pdf", new ByteArrayDataSource(pdfBytes, "application/pdf"));
+            }
 
             mailSender.send(msg);
             log.info("Poslat godisnji plan {} | From={} | To={} | Reply-To={} | Subject={}",
@@ -150,7 +155,7 @@ public class PlanMailService {
                 razlog == null || razlog.isBlank() ? "(nije naveden)" : razlog);
     }
 
-    public void posaljiOperativniPlan(OperativniPlan plan, Skola skola, byte[] wordBytes, String primalac) {
+    public void posaljiOperativniPlan(OperativniPlan plan, Skola skola, byte[] wordBytes, byte[] pdfBytes, String primalac) {
         String subject = "Operativni plan — " + plan.getNastavnik().punoIme()
                 + " — " + plan.getPredmet().getNaziv()
                 + " — " + plan.getOdeljenje().label()
@@ -164,13 +169,18 @@ public class PlanMailService {
             helper.setSubject(subject);
             helper.setText(teloOperativnog(plan, skola), false);
 
-            String fileName = "OperativniPlan_%s_%s_%s_%s.docx".formatted(
+            String baseName = "OperativniPlan_%s_%s_%s_%s".formatted(
                     plan.getPredmet().getNaziv().replaceAll("\\s+", "_"),
                     plan.getOdeljenje().label(),
                     nazivMeseca(plan.getMesec()),
                     plan.getSkolskaGodina().replace("/", "-"));
-            helper.addAttachment(fileName, new ByteArrayDataSource(wordBytes,
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
+            if (wordBytes != null) {
+                helper.addAttachment(baseName + ".docx", new ByteArrayDataSource(wordBytes,
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
+            }
+            if (pdfBytes != null) {
+                helper.addAttachment(baseName + ".pdf", new ByteArrayDataSource(pdfBytes, "application/pdf"));
+            }
 
             mailSender.send(msg);
             log.info("Poslat operativni plan {} | From={} | To={} | Reply-To={} | Subject={}",

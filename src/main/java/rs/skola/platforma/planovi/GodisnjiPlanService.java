@@ -133,6 +133,13 @@ public class GodisnjiPlanService {
         plan.setStatus(PlanStatus.PODNET);
         plan.setPodnetAt(OffsetDateTime.now());
         plan.setRazlogVracanja(null);
+        UUID idZaSlanje = plan.getId();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                isporukaService.posaljiAsinhrono(idZaSlanje);
+            }
+        });
         return toResponse(plan);
     }
 

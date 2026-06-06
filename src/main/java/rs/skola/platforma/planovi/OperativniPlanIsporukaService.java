@@ -22,4 +22,13 @@ public class OperativniPlanIsporukaService {
             log.error("Greska pri asinhronoj isporuci operativnog plana {}: {}", planId, ex.getMessage(), ex);
         }
     }
+
+    @Async
+    public void posaljiAsinhrono(UUID planId) {
+        try {
+            obradaService.posaljiNaSkolskiMail(planId);
+        } catch (Exception ex) {
+            log.error("Greska pri asinhronom slanju operativnog plana {} na skolski mail: {}", planId, ex.getMessage(), ex);
+        }
+    }
 }
