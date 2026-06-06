@@ -76,6 +76,9 @@ public class GodisnjiPlanService {
         if (plan.getStatus() == PlanStatus.ARHIVIRAN) {
             throw new ConflictException("Arhiviran plan se ne moze menjati");
         }
+        if (plan.getStatus() == PlanStatus.PODNET) {
+            throw new ConflictException("Podnet plan se ne moze menjati — zatrazi vracanje na doradu");
+        }
 
         plan.setRazred(req.razred());
         plan.setOdeljenjaIds(req.odeljenjaIds() == null ? List.of() : req.odeljenjaIds());

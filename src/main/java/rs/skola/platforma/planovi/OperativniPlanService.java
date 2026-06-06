@@ -78,6 +78,9 @@ public class OperativniPlanService {
         if (plan.getStatus() == PlanStatus.ARHIVIRAN) {
             throw new ConflictException("Arhiviran plan se ne moze menjati");
         }
+        if (plan.getStatus() == PlanStatus.PODNET) {
+            throw new ConflictException("Podnet plan se ne moze menjati — zatrazi vracanje na doradu");
+        }
         plan.setNedeljniFond(req.nedeljniFond());
         plan.setSamoprocenaIshoda(req.samoprocenaIshoda());
         plan.setNapomene(req.napomene());
