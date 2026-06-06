@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import rs.skola.platforma.common.exception.ConflictException;
 import rs.skola.platforma.common.exception.ResourceNotFoundException;
 import rs.skola.platforma.common.exception.TenantViolationException;
+import rs.skola.platforma.common.exception.ValidationException;
 import rs.skola.platforma.common.tenant.TenantContext;
 import rs.skola.platforma.katalog.domain.Ishod;
 import rs.skola.platforma.katalog.domain.MetodaRada;
