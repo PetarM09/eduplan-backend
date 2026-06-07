@@ -8,9 +8,14 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import rs.skola.platforma.common.domain.BaseEntity;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -39,6 +44,11 @@ public class Skola extends BaseEntity {
 
     @Column(name = "vazi_do")
     private LocalDate vaziDo;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "obrazovni_profili_ids", columnDefinition = "jsonb")
+    @Builder.Default
+    private List<UUID> obrazovniProfiliIds = new ArrayList<>();
 
     public boolean jeAktivnaNa(LocalDate datum) {
         if (!aktivan) return false;

@@ -11,6 +11,7 @@ import rs.skola.platforma.odeljenja.domain.Odeljenje;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -28,6 +29,21 @@ public class Predmet extends TenantAwareEntity {
 
     @Column(name = "fond_casova")
     private Short fondCasova;
+
+    @Column(name = "fond_teorija", nullable = false)
+    @Builder.Default
+    private Short fondTeorija = 0;
+
+    @Column(name = "fond_vezbe", nullable = false)
+    @Builder.Default
+    private Short fondVezbe = 0;
+
+    @Column(name = "fond_blok", nullable = false)
+    @Builder.Default
+    private Short fondBlok = 0;
+
+    @Column(name = "master_predmet_id")
+    private UUID masterPredmetId;
 
     @Column(nullable = false)
     @Builder.Default
