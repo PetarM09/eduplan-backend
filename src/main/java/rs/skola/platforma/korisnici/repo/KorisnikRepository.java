@@ -23,4 +23,16 @@ public interface KorisnikRepository extends JpaRepository<Korisnik, UUID> {
     List<Korisnik> findAllBySkolaIdAndUlogaOrderByPrezimeAscImeAsc(UUID skolaId, Uloga uloga);
 
     List<Korisnik> findAllBySkolaIdOrderByPrezimeAscImeAsc(UUID skolaId);
+
+    Optional<Korisnik> findByPozivnicaToken(UUID token);
+
+    @Query("""
+            SELECT k FROM Korisnik k
+            WHERE k.skola.id = :skolaId
+              AND k.pozivnicaToken IS NOT NULL
+            ORDER BY k.prezime ASC, k.ime ASC
+            """)
+    List<Korisnik> findPozvaniBySkolaId(UUID skolaId);
+
+    Optional<Korisnik> findBySkolaIdAndImeIgnoreCaseAndPrezimeIgnoreCase(UUID skolaId, String ime, String prezime);
 }

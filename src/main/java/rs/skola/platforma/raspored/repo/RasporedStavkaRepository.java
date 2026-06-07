@@ -110,4 +110,14 @@ public interface RasporedStavkaRepository extends JpaRepository<RasporedStavka, 
     @Query("SELECT DISTINCT rs.nastavnikLabel FROM RasporedStavka rs " +
             "WHERE rs.skolaId = :skolaId AND rs.korisnik IS NULL")
     List<String> distinctNemapiraneLabels(@Param("skolaId") UUID skolaId);
+
+    @Query("""
+            SELECT DISTINCT CONCAT(rs.odeljenje.razred, '-', rs.odeljenje.oznaka)
+            FROM RasporedStavka rs
+            WHERE rs.skolaId = :skolaId
+              AND rs.korisnik.id = :korisnikId
+            ORDER BY CONCAT(rs.odeljenje.razred, '-', rs.odeljenje.oznaka) ASC
+            """)
+    List<String> distinctOdeljenjaZaKorisnika(@Param("skolaId") UUID skolaId,
+                                              @Param("korisnikId") UUID korisnikId);
 }

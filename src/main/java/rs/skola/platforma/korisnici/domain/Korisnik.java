@@ -7,9 +7,13 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import rs.skola.platforma.common.domain.BaseEntity;
+import rs.skola.platforma.predmeti.domain.Predmet;
 import rs.skola.platforma.tenant.domain.Skola;
 
 import java.time.OffsetDateTime;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -30,7 +34,7 @@ public class Korisnik extends BaseEntity {
     @Column(nullable = false, length = 255)
     private String email;
 
-    @Column(name = "lozinka_hash", nullable = false, length = 255)
+    @Column(name = "lozinka_hash", length = 255)
     private String lozinkaHash;
 
     @Column(nullable = false, length = 100)
@@ -49,6 +53,30 @@ public class Korisnik extends BaseEntity {
 
     @Column(name = "poslednji_login")
     private OffsetDateTime poslednjiLogin;
+
+    @Column(name = "pozivnica_token", unique = true)
+    private UUID pozivnicaToken;
+
+    @Column(name = "pozivnica_istice")
+    private OffsetDateTime pozivnicaIstice;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private Poreklo poreklo = Poreklo.RUCNO;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "nastavnik_predmeti",
+            joinColumns = @JoinColumn(name = "nastavnik_id"),
+            inverseJoinColumns = @JoinColumn(name = "predmet_id")
+    )
+    @Builder.Default
+    private Set<Predmet> predmeti = new HashSet<>();
+
+    public boolean jePozvan() {
+        return pozivnicaToken != null;
+    }
 
     public String punoIme() {
         return ime + " " + prezime;

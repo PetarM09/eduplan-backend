@@ -38,6 +38,8 @@ public class SecurityConfig {
     private static final String[] PUBLIC_RUTE = {
             "/api/v1/auth/login",
             "/api/v1/auth/refresh",
+            "/api/v1/pozivnice/info/*",
+            "/api/v1/pozivnice/aktiviraj/*",
             "/actuator/health",
             "/actuator/health/**",
             "/actuator/info",
