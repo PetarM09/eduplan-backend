@@ -7,34 +7,48 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
  * Konverzija .docx -> .pdf preko LibreOffice-a u headless modu.
  *
- * Zahteva da je `soffice` (ili `libreoffice`) instaliran na sistemu.
- * Putanja je konfigurabilna kroz `app.libreoffice.binary` (default
- * "soffice" pa pretrazuje PATH).
+ * Resolver redosled za binary:
+ *   1) app.libreoffice.binary (env / config)
+ *   2) common paths: /Applications/LibreOffice.app/.../soffice (mac),
+ *      /usr/bin/soffice, /usr/local/bin/soffice, /opt/homebrew/bin/soffice
+ *   3) "soffice" (PATH lookup)
  *
- * Svaka konverzija dobija privatni `user-profile` direktorijum i izlazni
- * direktorijum koji se brisu posle. Time se sprecava zaglavljivanje
- * kad vise zahteva dolazi paralelno (LO sa default profilom drzi lock).
+ * Ako nista nije nadjeno, baca {@link PdfNotAvailableException} koji
+ * pozivaoci hvataju i nastavljaju bez PDF-a.
  */
 @Slf4j
 @Component
 public class WordToPdfConverter {
 
-    private final String binary;
-    private final long timeoutSec;
+    private static final List<String> KANDIDATI = List.of(
+            "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+            "/usr/bin/soffice",
+            "/usr/local/bin/soffice",
+            "/opt/homebrew/bin/soffice",
+            "/snap/bin/libreoffice"
+    );
 
-    public WordToPdfConverter(@Value("${app.libreoffice.binary:soffice}") String binary,
+    private final String konfigurisanaPutanja;
+    private final long timeoutSec;
+    private volatile String resolvedBinary;
+    private volatile boolean resolveAttempted;
+
+    public WordToPdfConverter(@Value("${app.libreoffice.binary:}") String binary,
                                 @Value("${app.libreoffice.timeout-sec:90}") long timeoutSec) {
-        this.binary = binary;
+        this.konfigurisanaPutanja = binary == null ? "" : binary.trim();
         this.timeoutSec = timeoutSec;
     }
 
     public byte[] konvertuj(byte[] docxBytes) {
+        String binary = pronadjiBinary();
         Path workDir = null;
         try {
             workDir = Files.createTempDirectory("plan-pdf-");
@@ -61,7 +75,6 @@ public class WordToPdfConverter {
             pb.redirectErrorStream(true);
             Process proc = pb.start();
 
-            // Drenirano da bi proces mogao da se zatvori (LO ume da blokira na stdout)
             byte[] logBytes = proc.getInputStream().readAllBytes();
             boolean finished = proc.waitFor(timeoutSec, TimeUnit.SECONDS);
             if (!finished) {
@@ -87,6 +100,61 @@ public class WordToPdfConverter {
         }
     }
 
+    public boolean dostupan() {
+        try {
+            pronadjiBinary();
+            return true;
+        } catch (PdfNotAvailableException ex) {
+            return false;
+        }
+    }
+
+    private String pronadjiBinary() {
+        if (resolvedBinary != null) return resolvedBinary;
+        synchronized (this) {
+            if (resolvedBinary != null) return resolvedBinary;
+            String found = otkrij();
+            resolveAttempted = true;
+            if (found == null) {
+                throw new PdfNotAvailableException(
+                        "LibreOffice 'soffice' binary nije pronadjen. Probao sam: "
+                                + (konfigurisanaPutanja.isEmpty() ? "(config prazan)" : konfigurisanaPutanja)
+                                + ", " + KANDIDATI + ", PATH. "
+                                + "Postavi app.libreoffice.binary ili instaliraj LibreOffice "
+                                + "(macOS: brew install --cask libreoffice).");
+            }
+            resolvedBinary = found;
+            log.info("LibreOffice binary: {}", resolvedBinary);
+            return resolvedBinary;
+        }
+    }
+
+    private String otkrij() {
+        if (!konfigurisanaPutanja.isEmpty()) {
+            if (Files.isExecutable(Paths.get(konfigurisanaPutanja))) return konfigurisanaPutanja;
+            if (proveriPath(konfigurisanaPutanja)) return konfigurisanaPutanja;
+        }
+        for (String kand : KANDIDATI) {
+            if (Files.isExecutable(Paths.get(kand))) return kand;
+        }
+        if (proveriPath("soffice")) return "soffice";
+        if (proveriPath("libreoffice")) return "libreoffice";
+        return null;
+    }
+
+    private boolean proveriPath(String ime) {
+        try {
+            Process p = new ProcessBuilder("which", ime).redirectErrorStream(true).start();
+            byte[] out = p.getInputStream().readAllBytes();
+            p.waitFor(5, TimeUnit.SECONDS);
+            String line = new String(out).trim();
+            return p.exitValue() == 0 && !line.isEmpty() && Files.isExecutable(Paths.get(line));
+        } catch (IOException | InterruptedException ex) {
+            if (ex instanceof InterruptedException) Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
     private void obrisiRekurzivno(Path dir) {
         try {
             if (!Files.exists(dir)) return;
@@ -100,5 +168,9 @@ public class WordToPdfConverter {
         } catch (IOException e) {
             log.warn("Ne mogu obrisati radni dir {}: {}", dir, e.getMessage());
         }
+    }
+
+    public static class PdfNotAvailableException extends RuntimeException {
+        public PdfNotAvailableException(String message) { super(message); }
     }
 }

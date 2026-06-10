@@ -42,12 +42,17 @@ public class OperativniPlanObradaService {
         TenantContext.set(plan.getSkolaId());
         try {
             byte[] wordBytes = exportService.generisiOperativniPlanWord(plan);
-            byte[] pdfBytes = exportService.generisiOperativniPlanPdf(plan);
-
             String wordPath = storageService.sacuvajOperativniWord(plan.getSkolaId(), plan.getId(), wordBytes);
-            String pdfPath = storageService.sacuvajOperativniPdf(plan.getSkolaId(), plan.getId(), pdfBytes);
             plan.setWordFajlPutanja(wordPath);
-            plan.setPdfFajlPutanja(pdfPath);
+
+            try {
+                byte[] pdfBytes = exportService.generisiOperativniPlanPdf(plan);
+                String pdfPath = storageService.sacuvajOperativniPdf(plan.getSkolaId(), plan.getId(), pdfBytes);
+                plan.setPdfFajlPutanja(pdfPath);
+            } catch (Exception ex) {
+                log.warn("PDF nije generisan za operativni plan {} ({}). Word je sacuvan.",
+                        planId, ex.getMessage());
+            }
             planRepo.save(plan);
         } finally {
             TenantContext.clear();
@@ -74,19 +79,27 @@ public class OperativniPlanObradaService {
                 return;
             }
             byte[] wordBytes;
-            byte[] pdfBytes;
-            if (plan.getWordFajlPutanja() == null || plan.getPdfFajlPutanja() == null) {
+            byte[] pdfBytes = null;
+            if (plan.getWordFajlPutanja() == null) {
                 wordBytes = exportService.generisiOperativniPlanWord(plan);
-                pdfBytes = exportService.generisiOperativniPlanPdf(plan);
                 String wordPath = storageService.sacuvajOperativniWord(plan.getSkolaId(), plan.getId(), wordBytes);
-                String pdfPath = storageService.sacuvajOperativniPdf(plan.getSkolaId(), plan.getId(), pdfBytes);
                 plan.setWordFajlPutanja(wordPath);
-                plan.setPdfFajlPutanja(pdfPath);
-                planRepo.save(plan);
             } else {
                 wordBytes = storageService.procitajOperativni(plan.getSkolaId(), plan.getId(), plan.getWordFajlPutanja());
-                pdfBytes = storageService.procitajOperativni(plan.getSkolaId(), plan.getId(), plan.getPdfFajlPutanja());
             }
+            if (plan.getPdfFajlPutanja() != null) {
+                pdfBytes = storageService.procitajOperativni(plan.getSkolaId(), plan.getId(), plan.getPdfFajlPutanja());
+            } else {
+                try {
+                    pdfBytes = exportService.generisiOperativniPlanPdf(plan);
+                    String pdfPath = storageService.sacuvajOperativniPdf(plan.getSkolaId(), plan.getId(), pdfBytes);
+                    plan.setPdfFajlPutanja(pdfPath);
+                } catch (Exception ex) {
+                    log.warn("PDF nije generisan pri slanju operativnog plana {} ({}). Saljemo samo Word.",
+                            planId, ex.getMessage());
+                }
+            }
+            planRepo.save(plan);
             mailService.posaljiOperativniPlan(plan, skola, wordBytes, pdfBytes, adresa);
         } finally {
             TenantContext.clear();

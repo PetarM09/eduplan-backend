@@ -36,13 +36,19 @@ public class PlanObradaService {
         TenantContext.set(plan.getSkolaId());
         try {
             byte[] wordBytes = exportService.generisiGodisnjiPlanWord(plan);
-            byte[] pdfBytes = exportService.generisiGodisnjiPlanPdf(plan);
-
             String wordPath = storageService.sacuvajWord(plan.getSkolaId(), plan.getId(), wordBytes);
-            String pdfPath = storageService.sacuvajPdf(plan.getSkolaId(), plan.getId(), pdfBytes);
-
             plan.setWordFajlPutanja(wordPath);
-            plan.setPdfFajlPutanja(pdfPath);
+
+            // PDF konverzija zahteva LibreOffice — ako nije instaliran ili
+            // padne, ne smemo da prekinemo cuvanje Word-a. Plan ostaje upotrebljiv.
+            try {
+                byte[] pdfBytes = exportService.generisiGodisnjiPlanPdf(plan);
+                String pdfPath = storageService.sacuvajPdf(plan.getSkolaId(), plan.getId(), pdfBytes);
+                plan.setPdfFajlPutanja(pdfPath);
+            } catch (Exception ex) {
+                log.warn("PDF nije generisan za plan {} ({}). Word je sacuvan.",
+                        planId, ex.getMessage());
+            }
             planRepo.save(plan);
         } finally {
             TenantContext.clear();
@@ -64,22 +70,28 @@ public class PlanObradaService {
                 log.info("Skola nema podesen mail za planove — preskacem slanje plana {}", plan.getId());
                 return;
             }
-            // Ako fajlovi jos uvek nisu generisani (npr. nastavnik podneo bez prethodne izmene
-            // nakon migracije), generisemo ih sada.
             byte[] wordBytes;
-            byte[] pdfBytes;
-            if (plan.getWordFajlPutanja() == null || plan.getPdfFajlPutanja() == null) {
+            byte[] pdfBytes = null;
+            if (plan.getWordFajlPutanja() == null) {
                 wordBytes = exportService.generisiGodisnjiPlanWord(plan);
-                pdfBytes = exportService.generisiGodisnjiPlanPdf(plan);
                 String wordPath = storageService.sacuvajWord(plan.getSkolaId(), plan.getId(), wordBytes);
-                String pdfPath = storageService.sacuvajPdf(plan.getSkolaId(), plan.getId(), pdfBytes);
                 plan.setWordFajlPutanja(wordPath);
-                plan.setPdfFajlPutanja(pdfPath);
-                planRepo.save(plan);
             } else {
                 wordBytes = storageService.procitaj(plan.getSkolaId(), plan.getId(), plan.getWordFajlPutanja());
-                pdfBytes = storageService.procitaj(plan.getSkolaId(), plan.getId(), plan.getPdfFajlPutanja());
             }
+            if (plan.getPdfFajlPutanja() != null) {
+                pdfBytes = storageService.procitaj(plan.getSkolaId(), plan.getId(), plan.getPdfFajlPutanja());
+            } else {
+                try {
+                    pdfBytes = exportService.generisiGodisnjiPlanPdf(plan);
+                    String pdfPath = storageService.sacuvajPdf(plan.getSkolaId(), plan.getId(), pdfBytes);
+                    plan.setPdfFajlPutanja(pdfPath);
+                } catch (Exception ex) {
+                    log.warn("PDF nije generisan pri slanju plana {} ({}). Saljemo samo Word.",
+                            planId, ex.getMessage());
+                }
+            }
+            planRepo.save(plan);
             mailService.posaljiGodisnjiPlan(plan, skola, wordBytes, pdfBytes, adresa);
         } finally {
             TenantContext.clear();
