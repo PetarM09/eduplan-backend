@@ -23,10 +23,25 @@ RUN ./mvnw -B -q package -DskipTests \
     && cp target/skolska-platforma-*.jar /workspace/app.jar
 
 # ---- Stage 2: RUNTIME ------------------------------------------------------
-FROM eclipse-temurin:21-jre-alpine AS runtime
+# Debian baza umesto Alpine — potreban je LibreOffice za Word->PDF konverziju
+# planova; LO se na Alpine-u ponasa nestabilno (fonts, runtime libs).
+FROM eclipse-temurin:21-jre AS runtime
+
+# LibreOffice headless za PDF konverziju + fontovi sa cirilicom.
+# --no-install-recommends drzi sliku malom (oko 600MB ukupno).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libreoffice-core \
+        libreoffice-writer \
+        fonts-dejavu \
+        fonts-liberation \
+        ca-certificates \
+        wget \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 # Non-root user — najbolji bezbednosni default
-RUN addgroup -S app && adduser -S -G app app
+RUN groupadd --system app && useradd --system --gid app --shell /bin/bash app
 
 # Storage direktorijum za Word/PDF planove (volume u produkciji)
 RUN mkdir -p /app/storage && chown -R app:app /app
