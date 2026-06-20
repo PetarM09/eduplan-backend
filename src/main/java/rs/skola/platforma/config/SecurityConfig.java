@@ -67,7 +67,9 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
-        cfg.setAllowedOriginPatterns(List.of("*"));
+        cfg.setAllowedOriginPatterns(List.of(
+                "http://localhost:5173",
+                "https://eduplan-frontend-plum.vercel.app"));
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
         cfg.setExposedHeaders(List.of("Authorization", "Content-Disposition"));
@@ -89,15 +91,17 @@ public class SecurityConfig {
                         .requestMatchers(PUBLIC_RUTE).permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(eh -> eh
-                        .authenticationEntryPoint((req, res, ex) -> writeErrorResponse(res, HttpServletResponse.SC_UNAUTHORIZED,
-                                "NEAUTORIZOVANO", "Token je nevalidan ili nedostaje"))
+                        .authenticationEntryPoint(
+                                (req, res, ex) -> writeErrorResponse(res, HttpServletResponse.SC_UNAUTHORIZED,
+                                        "NEAUTORIZOVANO", "Token je nevalidan ili nedostaje"))
                         .accessDeniedHandler((req, res, ex) -> writeErrorResponse(res, HttpServletResponse.SC_FORBIDDEN,
                                 "PRISTUP_ZABRANJEN", "Nemate dozvolu za ovu akciju")))
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 
-    private void writeErrorResponse(HttpServletResponse res, int status, String code, String message) throws java.io.IOException {
+    private void writeErrorResponse(HttpServletResponse res, int status, String code, String message)
+            throws java.io.IOException {
         res.setStatus(status);
         res.setContentType(MediaType.APPLICATION_JSON_VALUE);
         res.setCharacterEncoding("UTF-8");
