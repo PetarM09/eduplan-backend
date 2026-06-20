@@ -4,8 +4,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import rs.skola.platforma.auth.security.CustomUserDetails;
 import rs.skola.platforma.auth.web.LoginRequest;
+import rs.skola.platforma.auth.web.PromenaLozinkeRequest;
 import rs.skola.platforma.auth.web.RefreshRequest;
 import rs.skola.platforma.auth.web.TokenPair;
 import rs.skola.platforma.common.web.ApiResponse;
@@ -34,6 +37,14 @@ public class AuthController {
     @Operation(summary = "Opoziva refresh token (logout sa trenutnog uredjaja)")
     public ApiResponse<Void> logout(@RequestBody(required = false) RefreshRequest req) {
         authService.logout(req == null ? null : req.refreshToken());
+        return ApiResponse.ok();
+    }
+
+    @PostMapping("/promeni-lozinku")
+    @Operation(summary = "Menja lozinku ulogovanog korisnika (opoziva sve ostale sesije)")
+    public ApiResponse<Void> promeniLozinku(@AuthenticationPrincipal CustomUserDetails ja,
+                                            @Valid @RequestBody PromenaLozinkeRequest req) {
+        authService.promeniLozinku(ja, req);
         return ApiResponse.ok();
     }
 }
