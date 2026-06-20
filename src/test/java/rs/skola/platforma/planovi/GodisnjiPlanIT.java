@@ -104,7 +104,15 @@ class GodisnjiPlanIT extends AbstractIntegrationTest {
             assertThat(azurirano.getPdfFajlPutanja()).isNotNull();
         });
 
-        // 4. Mail je poslat tacno jednom
+        // 4. Podnosenje plana okida slanje na skolski mail (afterCommit -> async)
+        TenantContext.set(skola.getId());
+        try {
+            godisnjiService.podnesi(plan.id(), principalOf(nastavnik));
+        } finally {
+            TenantContext.clear();
+        }
+
+        // 5. Mail je poslat tacno jednom
         await().atMost(10, TimeUnit.SECONDS).untilAsserted(() ->
                 Mockito.verify(mailSender, Mockito.times(1)).send(Mockito.any(MimeMessage.class)));
     }

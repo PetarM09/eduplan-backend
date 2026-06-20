@@ -71,28 +71,33 @@ class TenantIzolacijaIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("Pregled odeljenja druge skole — kroz rotaciju koja referencira tudje UUID — vraca 403")
+    @DisplayName("Kreiranje rotacije za odeljenje druge skole vraca 403 PRISTUP_ZABRANJEN")
     void rotacijaSaTudjimOdeljenjem_vraca403() throws Exception {
         Skola skolaA = seeder.kreirajSkolu("Skola-A-Rot");
         Skola skolaB = seeder.kreirajSkolu("Skola-B-Rot");
-        Korisnik nastA = seeder.kreirajKorisnika(skolaA, Uloga.NASTAVNIK);
+        Korisnik koordA = seeder.kreirajKorisnika(skolaA, Uloga.KOORDINATOR);
         Korisnik nastB = seeder.kreirajKorisnika(skolaB, Uloga.NASTAVNIK);
-        Odeljenje odA = seeder.kreirajOdeljenje(skolaA, (short) 3, "1", nastA);
-        Odeljenje odB1 = seeder.kreirajOdeljenje(skolaB, (short) 3, "1", nastB);
-        Odeljenje odB2 = seeder.kreirajOdeljenje(skolaB, (short) 3, "2", nastB);
+        Odeljenje odB = seeder.kreirajOdeljenje(skolaB, (short) 3, "1", nastB);
 
         mockMvc.perform(post("/api/v1/rotacija")
-                        .header(HttpHeaders.AUTHORIZATION, auth.bearerHeader(nastA))
+                        .header(HttpHeaders.AUTHORIZATION, auth.bearerHeader(koordA))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "naziv": "Test rotacija",
-                                  "odeljenjaIds": ["%s","%s","%s"],
-                                  "grupaVelicina": 2,
-                                  "casovaNedeljno": 2,
-                                  "skolskaGodina": "2024/2025"
+                                  "odeljenjeId": "%s",
+                                  "skolskaGodina": "2024/2025",
+                                  "brojGrupa": 2,
+                                  "brojNedelja": 18,
+                                  "predmeti": [
+                                    {
+                                      "profesorLabel": "Petar Petrovic",
+                                      "naziv": "Racunarske mreze",
+                                      "casovaNedeljno": 2
+                                    }
+                                  ]
                                 }
-                                """.formatted(odA.getId(), odB1.getId(), odB2.getId())))
+                                """.formatted(odB.getId())))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("PRISTUP_ZABRANJEN"));
     }

@@ -35,6 +35,7 @@ build/
 ### Aplikacija ###
 .env
 .env.*
+!.env.example
 storage/
 logs/
 *.log

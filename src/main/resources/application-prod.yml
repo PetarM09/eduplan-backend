@@ -3,7 +3,10 @@
 
 spring:
   datasource:
-    # Obavezno postavi DB_URL/DB_USER/DB_PASS u produkciji
+    # Heroku Postgres add-on automatski injektuje JDBC_DATABASE_* varijable.
+    url: ${JDBC_DATABASE_URL}
+    username: ${JDBC_DATABASE_USERNAME}
+    password: ${JDBC_DATABASE_PASSWORD}
     hikari:
       maximum-pool-size: 30
       minimum-idle: 10
