@@ -46,3 +46,9 @@ logs/
 ### Word/Office lock fajlovi ###
 ~$*
 
+CLAUDE.local.md
+.claude/settings.local.json
+
+.claude/
+CLAUDE.md
+CLAUDE.local.md.example
